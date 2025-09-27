@@ -8,8 +8,6 @@ import EventManagement from "./Pages/EventManagement";
 import VolunteerHistory from "./Pages/VolunteerHistory";
 import VolunteerMatching from "./Pages/VolunteerMatching";
 
-
-
 function App() {
   const [count, setCount] = useState(0);
   return (
@@ -32,10 +30,10 @@ function App() {
             path="/VolunteerHistory"
             element={<VolunteerHistory></VolunteerHistory>}
           />
-          path="/VolunteerMatching"
-          element = {<VolunteerMatching></VolunteerMatching>}
-            />
-
+          <Route
+            path="/VolunteerMatching"
+            element={<VolunteerMatching></VolunteerMatching>}
+          />
         </Routes>
       </Router>
     </>
