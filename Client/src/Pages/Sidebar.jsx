@@ -43,9 +43,8 @@ function Sidebar() {
             </Badge>
           )}
         </Nav.Link>
-        <Nav.Link href="/VolunteerMatching">
-          Volunteer Matching
-        </Nav.Link>
+        <Nav.Link href="/VolunteerMatching">Volunteer Matching</Nav.Link>
+        <Nav.Link href="/VolunteerHistory">Volunteer History</Nav.Link>
         <Nav.Link href="/settings"> Settings</Nav.Link>
         <Nav.Link href="/logout"> Log Out</Nav.Link>
       </Nav>
