@@ -36,12 +36,15 @@ function Sidebar() {
           )}
         </Nav.Link>
         <Nav.Link href="/eventlist">
-          Event List{" "}
+          Assignments{" "}
           {newMessages > 0 && (
             <Badge bg="danger" pill className="ms-2">
               {newAssignments}
             </Badge>
           )}
+        </Nav.Link>
+        <Nav.Link href="/VolunteerMatching">
+          Volunteer Matching
         </Nav.Link>
         <Nav.Link href="/settings"> Settings</Nav.Link>
         <Nav.Link href="/logout"> Log Out</Nav.Link>

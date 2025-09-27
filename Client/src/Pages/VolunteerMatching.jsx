@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { Form, Button, Alert } from "react-bootstrap";
+import Sidebar from "./Sidebar";
 
 function VolunteerMatching(){
     //fake data until database made
@@ -62,6 +63,7 @@ function VolunteerMatching(){
 
   return (
     <>
+    <Sidebar></Sidebar>
     {/* gives the user feedback that their action worked */}
       <h2 className="mb-3">Volunteer Matching</h2>
 
