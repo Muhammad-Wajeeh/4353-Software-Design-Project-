@@ -6,6 +6,9 @@ import Register from "./Pages/Register";
 import ProfileManagement from "./Pages/ProfileManagement";
 import EventManagement from "./Pages/EventManagement";
 import VolunteerHistory from "./Pages/VolunteerHistory";
+import VolunteerMatching from "./Pages/VolunteerMatching";
+
+
 
 function App() {
   const [count, setCount] = useState(0);
@@ -19,6 +22,7 @@ function App() {
             path="/ProfileManagement"
             element={<ProfileManagement></ProfileManagement>}
           />
+
           <Route
             path="/EventManagement"
             element={<EventManagement></EventManagement>}
@@ -28,6 +32,10 @@ function App() {
             path="/VolunteerHistory"
             element={<VolunteerHistory></VolunteerHistory>}
           />
+          path="/VolunteerMatching"
+          element = {<VolunteerMatching></VolunteerMatching>}
+            />
+
         </Routes>
       </Router>
     </>

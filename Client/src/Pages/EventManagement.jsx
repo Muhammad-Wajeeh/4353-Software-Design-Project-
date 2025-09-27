@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { Form, Button } from "react-bootstrap";
+import Sidebar from "./Sidebar";
 
 function EventManagement() {
 
   return (
     <>
+    <Sidebar></Sidebar>
     <Form>
       <Form.Group className="mb-3" controlId="emEventName">
         <Form.Label>Event Name</Form.Label>
