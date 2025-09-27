@@ -7,6 +7,7 @@ import ProfileManagement from "./Pages/ProfileManagement";
 import EventManagement from "./Pages/EventManagement";
 import VolunteerHistory from "./Pages/VolunteerHistory";
 import VolunteerMatching from "./Pages/VolunteerMatching";
+import Sidebar from "./Pages/Sidebar";
 
 function App() {
   const [count, setCount] = useState(0);
@@ -14,6 +15,7 @@ function App() {
     <>
       <Router>
         <Routes>
+          <Route path="/" element={<Sidebar></Sidebar>} />
           <Route path="/Login" element={<Login></Login>} />
           <Route path="/Register" element={<Register></Register>} />
           <Route
