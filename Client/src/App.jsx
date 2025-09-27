@@ -4,8 +4,10 @@ import "./App.css";
 import Login from "./Pages/Login";
 import Register from "./Pages/Register";
 import ProfileManagement from "./Pages/ProfileManagement";
-import EventManagement from './Pages/EventManagement';
+import EventManagement from "./Pages/EventManagement";
+import VolunteerHistory from "./Pages/VolunteerHistory";
 import VolunteerMatching from "./Pages/VolunteerMatching";
+
 
 
 function App() {
@@ -13,7 +15,6 @@ function App() {
   return (
     <>
       <Router>
-
         <Routes>
           <Route path="/Login" element={<Login></Login>} />
           <Route path="/Register" element={<Register></Register>} />
@@ -21,17 +22,22 @@ function App() {
             path="/ProfileManagement"
             element={<ProfileManagement></ProfileManagement>}
           />
-                <Route
-          path="/EventManagement"
-          element = {<EventManagement></EventManagement>}
-            />
-            <Route
+
+          <Route
+            path="/EventManagement"
+            element={<EventManagement></EventManagement>}
+          />
+
+          <Route
+            path="/VolunteerHistory"
+            element={<VolunteerHistory></VolunteerHistory>}
+          />
           path="/VolunteerMatching"
           element = {<VolunteerMatching></VolunteerMatching>}
             />
+
         </Routes>
       </Router>
-
     </>
   );
 }
