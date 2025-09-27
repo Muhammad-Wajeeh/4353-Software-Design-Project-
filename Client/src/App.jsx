@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import './App.css'
 import Login from './Pages/Login'; 
 import Register from './Pages/Register';
+import EventManagement from './Pages/EventManagement';
 
 function App() {
   const [count, setCount] = useState(0)
@@ -19,6 +20,10 @@ function App() {
             <Route
           path="/Register"
           element = {<Register></Register>}
+            />
+            <Route
+          path="/EventManagement"
+          element = {<EventManagement></EventManagement>}
             />
           
           
