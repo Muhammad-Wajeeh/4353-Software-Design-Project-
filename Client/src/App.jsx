@@ -5,6 +5,7 @@ import Login from "./Pages/Login";
 import Register from "./Pages/Register";
 import ProfileManagement from "./Pages/ProfileManagement";
 import EventManagement from './Pages/EventManagement';
+import VolunteerMatching from "./Pages/VolunteerMatching";
 
 
 function App() {
@@ -23,6 +24,10 @@ function App() {
                 <Route
           path="/EventManagement"
           element = {<EventManagement></EventManagement>}
+            />
+            <Route
+          path="/VolunteerMatching"
+          element = {<VolunteerMatching></VolunteerMatching>}
             />
         </Routes>
       </Router>
