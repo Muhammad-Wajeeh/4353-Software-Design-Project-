@@ -2,14 +2,7 @@
 const express = require("express");
 const router = express.Router();
 
-// Define routes specific to users
-router.get("/", (req, res) => {
-  res.send("Get all users");
-});
 
-router.post("/", (req, res) => {
-  res.send("Create a new user");
-});
 
 router.get("/register", async (req, res) => {
   const { firstName, lastName, username, email, password } = req.body;
