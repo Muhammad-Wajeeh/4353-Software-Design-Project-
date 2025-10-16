@@ -4,7 +4,7 @@ const cors = require("cors");
 // const pool = require("./db");
 const bcrypt = require("bcrypt");
 const authRoutes = require("./routes/authRoutes");
-//const profileRoutes = require("./routes/profileRoutes");
+const profileRoutes = require("./routes/profileRoutes");
 
 //middleware
 
@@ -18,7 +18,7 @@ app.get("/", (req, res) => {
 });
 
 app.use("/auth", authRoutes);
-//app.use("/profile", profileRoutes);
+app.use("/profile", profileRoutes);
 
 app.listen(5000, () => {
   console.log("server has started on port 5000");
