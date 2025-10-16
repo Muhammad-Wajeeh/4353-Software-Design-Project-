@@ -16,4 +16,37 @@ const users = [
   }
 ];
 
-module.exports = { users };
+const volunteerHistories = [
+  {
+    userId: "u1",
+    events: [
+      {
+        eventId: "e1",
+        eventName: "Community Cleanup",
+        date: "2025-09-18",
+        hours: 4,
+        organization: "City of Houston",
+        status: "Completed"
+      },
+      {
+        eventId: "e2",
+        eventName: "Food Drive",
+        date: "2025-09-22",
+        hours: 3,
+        organization: "Houston Food Bank",
+        status: "Completed"
+      },
+      {
+        eventId: "e3",
+        eventName: "Animal Shelter Volunteering",
+        date: "2025-10-01",
+        hours: 5,
+        organization: "Houston Animal Rescue",
+        status: "Upcoming"
+      }
+    ]
+  }
+];
+
+module.exports = { users, volunteerHistories };
+
