@@ -30,29 +30,43 @@ function ProfileManagement() {
   const [availability, setAvailability] = useState([]); // array of ISO strings like "2025-10-05"
 
 const fetchProfile = async () => {
-    const { data } = await axios.get("http://localhost:5000/profile/u1");
-    const u = data.user;
+  const { data } = await axios.get("http://localhost:5000/profile/u1");
+  const u = data.user;
 
-    setFullName(u.name ?? "");
+  setFullName(u.name ?? "");
 
-    // naive parse of single location string "addr1, addr2, city, TX, 77001"
-    if (typeof u.location === "string" && u.location) {
-      const parts = u.location.split(",").map((s) => s.trim());
-      setAddress1(parts[0] ?? "");
-      setAddress2(parts[1] && /^(Apt|Unit|Suite|#|\d+)/i.test(parts[1]) ? parts[1] : "");
-      setCity(parts[2] ?? "");
-      setStateUS(parts[3] ?? "");
-      setZip(parts[4] ?? "");
-    }
+  // ✅ robust parse: handle missing Address 2 correctly
+  if (typeof u.location === "string" && u.location) {
+    const raw = u.location
+      .split(",")
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0); // remove empties
 
-    setSkillsSel(Array.isArray(u.skills) ? u.skills : []);
-    setPreferences(u?.preferences?.notes ?? "");
+    // Take values from the right end: zip, state, city
+    const zipPart   = raw.length >= 1 ? raw[raw.length - 1] : "";
+    const statePart = raw.length >= 2 ? raw[raw.length - 2] : "";
+    const cityPart  = raw.length >= 3 ? raw[raw.length - 3] : "";
 
-    // if backend now normalizes to { dates: [...] }
-    if (u?.availability?.dates && Array.isArray(u.availability.dates)) {
-      setAvailability(u.availability.dates);
-    }
-  };
+    // Whatever is left at the front is address lines
+    const streetParts = raw.slice(0, Math.max(0, raw.length - 3));
+    const addr1 = streetParts[0] || "";
+    const addr2 = streetParts.slice(1).join(", "); // join any remaining pieces
+
+    setAddress1(addr1);
+    setAddress2(addr2);
+    setCity(cityPart);
+    setStateUS(statePart.length <= 3 ? statePart : ""); // basic 2–3 char guard
+    setZip(zipPart);
+  }
+
+  setSkillsSel(Array.isArray(u.skills) ? u.skills : []);
+  setPreferences(u?.preferences?.notes ?? "");
+
+  // if backend normalizes to { dates: [...] }
+  if (u?.availability?.dates && Array.isArray(u.availability.dates)) {
+    setAvailability(u.availability.dates);
+  }
+};
 
 useEffect(() => {
     fetchProfile().catch((e) => console.error("Load profile failed", e));
