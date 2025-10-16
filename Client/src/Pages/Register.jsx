@@ -26,16 +26,18 @@ function Register({
   const onSubmitForm = async (e) => {
     e.preventDefault(); // prevent full page reload
 
+    console.log("running on submit form");
+
     try {
       const body = {
         memberFirstName: memberFirstName,
         memberLastName: memberLastName,
         username: username,
-        password: password,
         email: email,
+        password: password,
       };
 
-      const response = await fetch("http://localhost:5000/register", {
+      const response = await fetch("http://localhost:5000/Auth/Register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -109,9 +111,16 @@ function Register({
           />
         </Form.Group>
 
-        <Button variant="primary" type="submit" onClick={onSubmitForm}>
-          Submit
-        </Button>
+        <Form.Group>
+          <Button variant="primary" type="submit" onClick={onSubmitForm}>
+            Submit
+          </Button>
+        </Form.Group>
+
+        <a className="loginAndRegisterLinks" href="/login">
+          {" "}
+          Already Have An Account? <br></br>Login Instead
+        </a>
       </Form>
     </>
   );

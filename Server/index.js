@@ -16,7 +16,7 @@ app.get("/", (req, res) => {
   res.send("API is running");
 });
 
-app.use("/", authRoutes);
+app.use("/auth", authRoutes);
 
 app.listen(5000, () => {
   console.log("server has started on port 5000");
