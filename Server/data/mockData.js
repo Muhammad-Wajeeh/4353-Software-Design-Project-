@@ -71,5 +71,41 @@ const notifications = [
   }
 ];
 
-module.exports = { users, volunteerHistories, notifications };
+const volunteerEvents = [
+  {
+    id: "e1",
+    name: "Community Cleanup",
+    date: "2025-10-21",
+    location: "Houston, TX",
+    requiredSkills: ["first aid", "organization"],
+    description: "Help clean up the community park. Gloves and bags provided.",
+    organization: "City of Houston",
+    status: "Open",
+    capacity: 30
+  },
+  {
+    id: "e2",
+    name: "Food Drive",
+    date: "2025-10-25",
+    location: "Houston, TX",
+    requiredSkills: ["logistics"],
+    description: "Sort and pack food donations for distribution.",
+    organization: "Houston Food Bank",
+    status: "Open",
+    capacity: 50
+  },
+  {
+    id: "e3",
+    name: "Animal Shelter Help",
+    date: "2025-11-02",
+    location: "Katy, TX",
+    requiredSkills: ["animal care", "organization"],
+    description: "Assist with cleaning and animal care at the shelter.",
+    organization: "Houston Animal Rescue",
+    status: "Open",
+    capacity: 15
+  }
+];
 
+// ✅ make sure volunteerEvents is included here:
+module.exports = { users, volunteerHistories, notifications, volunteerEvents };

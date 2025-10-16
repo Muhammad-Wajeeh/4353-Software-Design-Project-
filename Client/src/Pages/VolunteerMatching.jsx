@@ -6,6 +6,7 @@ import Badge from "react-bootstrap/Badge";
 import Button from "react-bootstrap/Button";
 import Form from "react-bootstrap/Form";
 import Spinner from "react-bootstrap/Spinner";
+import { useNavigate } from "react-router-dom";
 
 const userId = "u1"; // mock user until auth is wired
 
@@ -51,7 +52,7 @@ export default function VolunteerMatching() {
 
   // ✅ track events already joined (backed by notifications meta.eventId)
   const [joinedIds, setJoinedIds] = useState(() => new Set());
-
+  const navigate = useNavigate();
   // fetch profile + events + existing “joined” from notifications
   useEffect(() => {
     let mounted = true;
@@ -248,10 +249,7 @@ export default function VolunteerMatching() {
                       >
                         {isJoined ? "Joined" : "Join"}
                       </Button>
-                      <Button
-                        variant="outline-secondary"
-                        onClick={() => alert("Coming soon: event details modal.")}
-                      >
+                      <Button variant="outline-secondary" onClick={() => navigate(`/events/${ev.id}`)}>
                         Details
                       </Button>
                     </div>
