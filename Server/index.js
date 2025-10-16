@@ -1,7 +1,7 @@
 const express = require("express");
 const app = express();
 const cors = require("cors");
-const pool = require("./db");
+// const pool = require("./db");
 const bcrypt = require("bcrypt");
 
 //middleware
@@ -15,17 +15,31 @@ app.get("/", (req, res) => {
   res.send("API is running");
 });
 
-app.post("/register", async (req, res) => {
-  const { firstName, lastName, username, password, email } = req.body;
-  // console.log(req.body);
-  try {
-    const saltRounds = 10;
-    const hash = await bcrypt.hash(password, saltRounds);
+app.get("/register", async (req, res) => {
+  const { firstName, lastName, username, email, password} = req.body;
+  console.log(req.body);
 
-    await pool.query(
-      "INSERT INTO members (firstName, LastName, username, password, email) VALUES($1, $2, $3, $4, $5)",
-      [firstName, lastName, username, hash, email]
-    );
+  try {
+    // hard coding the storage for now
+    const tempStorageForRegistrationInfo = {
+      firstName: firstName,
+      lastName: lastName,
+      username: username,
+      password: password,
+      email: email,
+    };
+
+    console.log(tempStorageForRegistrationInfo)
+
+    // ----------- will be used when we implement DB
+
+    // const saltRounds = 10;
+    // const hash = await bcrypt.hash(password, saltRounds);
+
+    // await pool.query(
+    //   "INSERT INTO members (firstName, LastName, username, password, email) VALUES($1, $2, $3, $4, $5)",
+    //   [firstName, lastName, username, hash, email]
+    // );
     res.json("Account Created");
   } catch (err) {
     console.log(err.message);
