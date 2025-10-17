@@ -48,5 +48,28 @@ const volunteerHistories = [
   }
 ];
 
-module.exports = { users, volunteerHistories };
+const notifications = [
+  {
+    id: "n1",
+    userId: "u1",
+    type: "assignment",               // assignment | update | reminder
+    title: "You were assigned to Food Drive",
+    message: "You're confirmed for Food Drive on 2025-10-22 at 10:00 AM.",
+    createdAt: "2025-10-15T14:00:00Z",
+    read: false,
+    meta: { eventId: "e2" }
+  },
+  {
+    id: "n2",
+    userId: "u1",
+    type: "reminder",
+    title: "Event starts tomorrow",
+    message: "Community Cleanup starts tomorrow at 9:00 AM.",
+    createdAt: "2025-10-16T13:00:00Z",
+    read: false,
+    meta: { eventId: "e1" }
+  }
+];
+
+module.exports = { users, volunteerHistories, notifications };
 

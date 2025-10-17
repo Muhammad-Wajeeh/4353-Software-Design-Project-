@@ -8,6 +8,7 @@ import EventManagement from "./Pages/EventManagement";
 import VolunteerHistory from "./Pages/VolunteerHistory";
 import VolunteerMatching from "./Pages/VolunteerMatching";
 import Sidebar from "./Pages/Sidebar";
+import Inbox from "./Pages/Inbox";
 
 function App() {
   const [count, setCount] = useState(0);
@@ -35,6 +36,10 @@ function App() {
           <Route
             path="/VolunteerMatching"
             element={<VolunteerMatching></VolunteerMatching>}
+          />
+          <Route
+            path="/inbox"
+            element={<Inbox></Inbox>}
           />
         </Routes>
       </Router>

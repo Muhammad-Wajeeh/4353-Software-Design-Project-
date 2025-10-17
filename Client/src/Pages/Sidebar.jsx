@@ -1,14 +1,46 @@
-import React from "react";
-import { useState } from "react";
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import React, { useEffect, useState } from "react";
 import { Nav } from "react-bootstrap";
+import { Link, useLocation } from "react-router-dom";
 import Badge from "react-bootstrap/Badge";
+import axios from "axios";
 import "./Sidebar.css"; // style the sidebar layout
 
 function Sidebar() {
-  const newMessages = 3; // replace with state from API or props
-  const newEvents = 6;
-  const newAssignments = 2;
+  const location = useLocation();
+
+  // TODO: wire these later if you add APIs for events/assignments
+  const [newEvents] = useState(6);
+  const [newAssignments] = useState(2);
+
+  // 🔔 real unread notifications count
+  const [unreadNotifs, setUnreadNotifs] = useState(0);
+  const userId = "u1"; // swap when auth is wired
+
+  useEffect(() => {
+  const fetchUnread = async () => {
+    try {
+      const { data } = await axios.get(
+        `http://localhost:5000/notifications/${userId}`,
+        { params: { onlyUnread: true } }
+      );
+      setUnreadNotifs((data.notifications || []).length);
+    } catch (_) {
+      setUnreadNotifs(0);
+    }
+  };
+
+  fetchUnread();
+
+  // 🔔 listen for update events from Inbox
+  const handleRefresh = () => fetchUnread();
+  window.addEventListener("notificationsUpdated", handleRefresh);
+
+  // Cleanup
+  return () => {
+    window.removeEventListener("notificationsUpdated", handleRefresh);
+  };
+}, [location.pathname]);
+
 
   return (
     <div className="sidebar">
@@ -17,36 +49,43 @@ function Sidebar() {
       </div>
 
       <Nav className="flex-column">
-        <Nav.Link href="/eventmanagement">Event Management</Nav.Link>
-        <Nav.Link href="/profilemanagement">Profile Management</Nav.Link>
-        <Nav.Link href="/eventlist">
+        <Nav.Link as={Link} to="/eventmanagement">Event Management</Nav.Link>
+
+        <Nav.Link as={Link} to="/profilemanagement">Profile Management</Nav.Link>
+
+        <Nav.Link as={Link} to="/eventlist">
           Event List{" "}
-          {newMessages > 0 && (
+          {newEvents > 0 && (
             <Badge bg="danger" pill className="ms-2">
               {newEvents}
             </Badge>
           )}
         </Nav.Link>
-        <Nav.Link href="/inbox">
+
+        <Nav.Link as={Link} to="/inbox">
           Inbox{" "}
-          {newMessages > 0 && (
+          {unreadNotifs > 0 && (
             <Badge bg="danger" pill className="ms-2">
-              {newMessages}
+              {unreadNotifs}
             </Badge>
           )}
         </Nav.Link>
-        <Nav.Link href="/eventlist">
+
+        <Nav.Link as={Link} to="/eventlist">
           Assignments{" "}
-          {newMessages > 0 && (
+          {newAssignments > 0 && (
             <Badge bg="danger" pill className="ms-2">
               {newAssignments}
             </Badge>
           )}
         </Nav.Link>
-        <Nav.Link href="/VolunteerMatching">Volunteer Matching</Nav.Link>
-        <Nav.Link href="/VolunteerHistory">Volunteer History</Nav.Link>
-        <Nav.Link href="/settings"> Settings</Nav.Link>
-        <Nav.Link href="/logout"> Log Out</Nav.Link>
+
+        <Nav.Link as={Link} to="/VolunteerMatching">Volunteer Matching</Nav.Link>
+
+        <Nav.Link as={Link} to="/VolunteerHistory">Volunteer History</Nav.Link>
+
+        <Nav.Link as={Link} to="/settings">Settings</Nav.Link>
+        <Nav.Link as={Link} to="/logout">Log Out</Nav.Link>
       </Nav>
     </div>
   );
