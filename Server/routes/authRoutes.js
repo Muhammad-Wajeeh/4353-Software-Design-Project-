@@ -7,6 +7,7 @@ const jwt = require("jsonwebtoken");
 const JWT_SECRET = process.env.JWT_SECRET;
 let blacklistedTokens = [];
 
+
 router.post("/register", async (req, res) => {
   const { firstName, lastName, username, email, password } = req.body;
   console.log(req.body);
