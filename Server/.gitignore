@@ -1,2 +1,6 @@
 node_modules
 .env
+
+# Jest coverage output
+coverage/
+Server/coverage/
