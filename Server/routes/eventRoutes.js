@@ -1,162 +1,115 @@
-// Server/routes/eventRoutes.js
 const express = require("express");
 const router = express.Router();
-const { events } = require("../data/mockData"); // <-- use `events`
+const { events } = require("../data/mockData");
 
-var tempListOfEvents = [];
+// --------------------
+// Existing endpoints
+// --------------------
 
-router.post(
-  "/create",
-  // authenticateToken,
-  // authorizeRoles("Admin"),
-  async (req, res) => {
-    const {
-      eventName,
-      eventDescription,
-      eventLocation,
-      eventZipCode,
-      eventRequiredSkills,
-      eventUrgency,
-      eventDate,
-    } = req.body;
-
-    console.log(
-      eventName,
-      eventDescription,
-      eventLocation,
-      eventZipCode,
-      eventRequiredSkills,
-      eventUrgency,
-      eventDate
-    );
-    try {
-      var tempEventDict = {
-        eventName: eventName,
-        eventDescription: eventDescription,
-        eventLocation: eventLocation,
-        eventZipCode: eventZipCode,
-        eventRequiredSkills: eventRequiredSkills,
-        eventUrgency: eventUrgency,
-        eventDate: eventDate,
-      };
-
-      console.log(tempEventDict);
-
-      tempListOfEvents.push(tempEventDict);
-
-      for (var x of tempListOfEvents) {
-        console.log(x.eventName);
-      }
-
-      // implement when DB is created
-      //   await pool.query(
-      //     "INSERT INTO Events (id, name, worthinpoints, eventdate) VALUES ($1, $2, $3, $4)",
-      //     [eventId, eventName, eventWorthInPoints, eventDate]
-      //   );
-
-      res.json("Event successfully created");
-    } catch (error) {
-      console.log(error);
-      res.json("Event could not be created");
-    }
-  }
-);
-
-router.get(
-  "/getAll",
-  // authenticateToken,
-  // authorizeRoles("Admin", "Member"),
-  async (req, res) => {
-    try {
-      //   const responseOfEventNames = await pool.query(
-      //     "SELECT name, worthinpoints, description, eventdate FROM events"
-      //   );
-      //   console.log(responseOfEventNames);
-      //   res.json(responseOfEventNames.rows);
-      res.json(tempListOfEvents);
-    } catch (error) {
-      res.json("No Events Found");
-    }
-  }
-);
-
-router.delete(
-  "/delete",
-  // authenticateToken,
-  // authorizeRoles("Admin", "Member"),
-  async (req, res) => {
-    const { eventName } = req.body;
-    console.log(eventName);
-    try {
-      const index = tempListOfEvents.findIndex(
-        (evt) => evt.eventName === eventName
-      );
-
-      if (index !== -1) {
-        // remove it in place
-        tempListOfEvents.splice(index, 1);
-      }
-      res.json(tempListOfEvents);
-    } catch (error) {
-      res.json("No Events Found");
-    }
-  }
-);
-
-router.get(
-  "/get/:eventName",
-  // authenticateToken,
-  // authorizeRoles("Admin", "Member"),
-  async (req, res) => {
-    var eventName = req.params.eventName;
-    console.log(eventName);
-    try {
-      const index = tempListOfEvents.findIndex(
-        (evt) => evt.eventName === eventName
-      );
-
-      res.json(tempListOfEvents[index]);
-    } catch (error) {
-      res.json("No Events Found");
-    }
-  }
-);
-
-router.put(
-  "/Edit/:eventName",
-  // authenticateToken,
-  // authorizeRoles("Admin", "Member"),
-  async (req, res) => {
-    const event = req.body;
-    console.log(event);
-    var eventName = req.params.eventName;
-    try {
-      const index = tempListOfEvents.findIndex(
-        (evt) => evt.eventName === eventName
-      );
-
-      // Merge old and new data safely
-      tempListOfEvents[index] = { ...tempListOfEvents[index], ...event };
-
-      res.json(tempListOfEvents[index]);
-    } catch (error) {
-      res.json("No Events Found");
-    }
-  }
-);
-// GET /events
+// GET /events -> { events: [...] }
 router.get("/", (req, res) => {
+  res.status(200).json({ events });
+});
+
+// GET /events/:id -> { event }
+router.get("/:id", (req, res) => {
+  const event = events.find((e) => e.id === req.params.id);
+  if (!event) return res.status(404).json({ message: "Event not found" });
+  res.status(200).json({ event });
+});
+
+// ----------------------------------------------------
+// Aliases to support current frontend client endpoints
+// ----------------------------------------------------
+
+// GET /event/getall  -> { events }
+router.get("/event/getall", (req, res) => {
+  res.status(200).json({ events });
+});
+
+// POST /event/create  (body: client form shape)
+router.post("/event/create", (req, res) => {
+  const {
+    eventName,
+    eventDescription,
+    eventLocation,
+    eventZipCode,
+    eventRequiredSkills = [],
+    eventUrgency,
+    eventDate,
+  } = req.body || {};
+
+  // Basic validation
+  if (!eventName || !eventDate) {
+    return res.status(400).json({ message: "eventName and eventDate are required" });
+  }
+
+  const newEvent = {
+    id: "e" + Math.random().toString(36).slice(2, 8),
+    name: eventName,
+    description: eventDescription || "",
+    location: eventLocation || "",
+    zip: eventZipCode || "",
+    requiredSkills: Array.isArray(eventRequiredSkills) ? eventRequiredSkills : [],
+    urgency: eventUrgency || "Low",
+    date: eventDate,
+    status: "Open",
+    capacity: 0,
+    organization: "VolunteerHub",
+  };
+
+  events.push(newEvent);
+  return res.status(201).json({ event: newEvent, events });
+});
+
+// DELETE /event/delete  (body: { eventName })
+router.delete("/event/delete", (req, res) => {
+  const { eventName } = req.body || {};
+  if (!eventName) return res.status(400).json({ message: "eventName required" });
+
+  const idx = events.findIndex((e) => e.name === eventName);
+  if (idx === -1) return res.status(404).json({ message: "Event not found" });
+
+  events.splice(idx, 1);
   return res.status(200).json({ events });
 });
 
-// GET /events/:id
-router.get("/:id", (req, res) => {
-  const id = String(req.params.id);
-  const event = events.find((e) => String(e.id) === id);
-  if (!event) {
-    return res.status(404).json({ message: "Event not found" });
-  }
-  return res.status(200).json({ event });
+// GET /event/get/:name -> returns in the client’s expected shape
+router.get("/event/get/:name", (req, res) => {
+  const ev = events.find((e) => e.name === req.params.name);
+  if (!ev) return res.status(404).json({ message: "Event not found" });
+
+  return res.json({
+    eventName: ev.name,
+    eventDescription: ev.description,
+    eventLocation: ev.location,
+    eventZipCode: ev.zip,
+    eventRequiredSkills: ev.requiredSkills,
+    eventUrgency: ev.urgency,
+    eventDate: ev.date,
+  });
+});
+
+// PUT /event/edit/:name  (body: client form shape)
+router.put("/event/edit/:name", (req, res) => {
+  const idx = events.findIndex((e) => e.name === req.params.name);
+  if (idx === -1) return res.status(404).json({ message: "Event not found" });
+
+  const p = req.body || {};
+  events[idx] = {
+    ...events[idx],
+    name: p.eventName ?? events[idx].name,
+    description: p.eventDescription ?? events[idx].description,
+    location: p.eventLocation ?? events[idx].location,
+    zip: p.eventZipCode ?? events[idx].zip,
+    requiredSkills: Array.isArray(p.eventRequiredSkills)
+      ? p.eventRequiredSkills
+      : events[idx].requiredSkills,
+    urgency: p.eventUrgency ?? events[idx].urgency,
+    date: p.eventDate ?? events[idx].date,
+  };
+
+  return res.json({ event: events[idx] });
 });
 
 module.exports = router;

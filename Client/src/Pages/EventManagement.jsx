@@ -1,41 +1,58 @@
 import { useState, useEffect } from "react";
-import {
-  BrowserRouter as Router,
-  Routes,
-  Route,
-  useNavigate,
-} from "react-router-dom";
-import { Form, Button, Card, ListGroup } from "react-bootstrap";
+import { useNavigate } from "react-router-dom";
+import { Form, Button, Card } from "react-bootstrap";
 import Sidebar from "./Sidebar";
 
-function EventManagement({
-  eventName,
-  setEventName,
-  eventDescription,
-  setEventDescription,
-  eventLocation,
-  setEventLocation,
-  eventZipCode,
-  setEventZipCode,
-  eventRequiredSkills,
-  setEventRequiredSkills,
-  eventUrgency,
-  setEventUrgency,
-  eventDate,
-  setEventDate,
-  eventsList,
-  setEventsList,
-}) {
+function EventManagement(props) {
+  // Support both “lifted state via props” AND local state (fallbacks)
+  const [localEventName, setLocalEventName] = useState("");
+  const [localEventDescription, setLocalEventDescription] = useState("");
+  const [localEventLocation, setLocalEventLocation] = useState("");
+  const [localEventZipCode, setLocalEventZipCode] = useState("");
+  const [localEventRequiredSkills, setLocalEventRequiredSkills] = useState([]);
+  const [localEventUrgency, setLocalEventUrgency] = useState("");
+  const [localEventDate, setLocalEventDate] = useState("");
+  const [localEventsList, setLocalEventsList] = useState([]);
+
+  const eventName = props.eventName ?? localEventName;
+  const setEventName = props.setEventName ?? setLocalEventName;
+
+  const eventDescription = props.eventDescription ?? localEventDescription;
+  const setEventDescription = props.setEventDescription ?? setLocalEventDescription;
+
+  const eventLocation = props.eventLocation ?? localEventLocation;
+  const setEventLocation = props.setEventLocation ?? setLocalEventLocation;
+
+  const eventZipCode = props.eventZipCode ?? localEventZipCode;
+  const setEventZipCode = props.setEventZipCode ?? setLocalEventZipCode;
+
+  const eventRequiredSkills =
+    props.eventRequiredSkills ?? localEventRequiredSkills;
+  const setEventRequiredSkills =
+    props.setEventRequiredSkills ?? setLocalEventRequiredSkills;
+
+  const eventUrgency = props.eventUrgency ?? localEventUrgency;
+  const setEventUrgency = props.setEventUrgency ?? setLocalEventUrgency;
+
+  const eventDate = props.eventDate ?? localEventDate;
+  const setEventDate = props.setEventDate ?? setLocalEventDate;
+
+  const eventsList = props.eventsList ?? localEventsList;
+  const setEventsList = props.setEventsList ?? setLocalEventsList;
+
+  const navigate = useNavigate();
+
   const onSubmitForm = async (e) => {
+    e.preventDefault(); // prevent full page reload
     try {
       const body = {
-        eventName: eventName,
-        eventDescription: eventDescription,
-        eventLocation: eventLocation,
-        eventZipCode: eventZipCode,
-        eventRequiredSkills: eventRequiredSkills,
-        eventUrgency: eventUrgency,
-        eventDate: eventDate,
+        eventName,
+        eventDescription,
+        eventLocation,
+        eventZipCode,
+        eventRequiredSkills,
+        eventUrgency,
+        eventDate,
       };
 
       const response = await fetch("http://localhost:5000/event/create", {
@@ -43,64 +60,73 @@ function EventManagement({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
+
+      if (!response.ok) {
+        const msg = await response.text();
+        throw new Error(msg || "Create failed");
+      }
+
+      // refresh list + clear form
+      await getEvents();
+      setEventName("");
+      setEventDescription("");
+      setEventLocation("");
+      setEventZipCode("");
+      setEventRequiredSkills([]);
+      setEventUrgency("");
+      setEventDate("");
+      alert("Event created!");
     } catch (err) {
-      console.log(err);
+      console.error(err);
+      alert("Could not create event.");
     }
   };
 
   const getEvents = async () => {
     try {
-      // const token = localStorage.getItem("token");
       const response = await fetch("http://localhost:5000/event/getall", {
         method: "GET",
-        headers: {
-          // Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
       });
-      const jsonData = await response.json();
-      setEventsList(jsonData);
+      if (!response.ok) throw new Error("Failed to fetch events");
+      const json = await response.json();
+      // server returns { events: [...] }
+      setEventsList(Array.isArray(json.events) ? json.events : []);
     } catch (error) {
-      console.log(error);
+      console.error(error);
+      setEventsList([]); // never let it be non-array
     }
   };
 
   const onClickDeleteButton = async (eventNameToBeDeleted) => {
     try {
-      const body = {
-        eventName: eventNameToBeDeleted,
-      };
+      const body = { eventName: eventNameToBeDeleted };
       const response = await fetch("http://localhost:5000/event/delete", {
         method: "DELETE",
-        headers: {
-          // Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      const jsonData = await response.json();
-      setEventsList(jsonData);
+      if (!response.ok) throw new Error("Delete failed");
+      const json = await response.json();
+      setEventsList(Array.isArray(json.events) ? json.events : []);
     } catch (error) {
-      console.log(error);
+      console.error(error);
+      alert("Could not delete event.");
     }
   };
 
-  const navigate = useNavigate();
-
-  const handleEdit = (eventName) => {
-    navigate(`/events/edit/${encodeURIComponent(eventName)}`);
+  const handleEdit = (name) => {
+    navigate(`/events/edit/${encodeURIComponent(name)}`);
   };
 
-  useEffect(() =>
-    //use effect is interesting, it basically runs 'side effects' when the component that 'useEffect' is in runs. In our case, our side effect(s) is getTodos
-    {
-      getEvents();
-    }, []); // this empty brackets tells the useEffect to only run the side effect once.
+  useEffect(() => {
+    getEvents();
+  }, []);
 
   return (
     <>
-      <Sidebar></Sidebar>
-      <Form className="formAndCards">
+      <Sidebar />
+      <Form className="formAndCards" onSubmit={onSubmitForm}>
         <div className="formSection">
           <Form.Group className="mb-3" controlId="emEventName">
             <Form.Label>Event Name</Form.Label>
@@ -110,20 +136,21 @@ function EventManagement({
               maxLength={100}
               required
               name="eventName"
+              value={eventName}
               onChange={(e) => setEventName(e.target.value)}
             />
             <Form.Text muted>Maximum 100 characters.</Form.Text>
           </Form.Group>
 
           <Form.Group className="mb-3" controlId="emDescription">
-            {" "}
-            <Form.Label>Event Description</Form.Label>{" "}
+            <Form.Label>Event Description</Form.Label>
             <Form.Control
               as="textarea"
               rows={5}
               placeholder="Describe the event..."
               required
               name="description"
+              value={eventDescription}
               onChange={(e) => setEventDescription(e.target.value)}
             />
           </Form.Group>
@@ -136,6 +163,7 @@ function EventManagement({
               placeholder="Enter location (address or venue)"
               required
               name="location"
+              value={eventLocation}
               onChange={(e) => setEventLocation(e.target.value)}
             />
           </Form.Group>
@@ -146,7 +174,8 @@ function EventManagement({
               type="number"
               placeholder="Enter Zip/Postal Code"
               required
-              name="location"
+              name="zip"
+              value={eventZipCode}
               onChange={(e) => setEventZipCode(e.target.value)}
             />
           </Form.Group>
@@ -158,6 +187,7 @@ function EventManagement({
               required
               name="requiredSkills"
               style={{ minHeight: 140 }}
+              value={eventRequiredSkills}
               onChange={(e) => {
                 const selected = Array.from(
                   e.target.selectedOptions,
@@ -184,6 +214,7 @@ function EventManagement({
             <Form.Select
               required
               name="urgency"
+              value={eventUrgency}
               onChange={(e) => setEventUrgency(e.target.value)}
             >
               <option value="">Select urgency...</option>
@@ -200,27 +231,30 @@ function EventManagement({
               type="date"
               required
               name="eventDate"
+              value={eventDate}
               onChange={(e) => setEventDate(e.target.value)}
             />
           </Form.Group>
 
-          <Button type="submit" variant="primary" onClick={onSubmitForm}>
+          <Button type="submit" variant="primary">
             Save Event
           </Button>
         </div>
 
         <div className="cardsContainer">
-          {eventsList.map((event, index) => (
-            <Card style={{ width: "18rem" }}>
+          {(Array.isArray(eventsList) ? eventsList : []).map((event) => (
+            <Card key={event.id} style={{ width: "18rem" }}>
               <Card.Body>
-                <Card.Title>{event.eventName}</Card.Title>
+                <Card.Title>{event.name ?? event.eventName}</Card.Title>
                 <Card.Subtitle className="mb-2 text-muted">
-                  {event.eventLocation}
+                  {event.location ?? event.eventLocation}
                 </Card.Subtitle>
                 <Card.Subtitle className="mb-2 text-muted">
-                  {event.eventDate}
+                  {event.date ?? event.eventDate}
                 </Card.Subtitle>
-                <Card.Text>{event.eventDescription}</Card.Text>
+                <Card.Text>
+                  {event.description ?? event.eventDescription}
+                </Card.Text>
               </Card.Body>
 
               <Card.Body>
@@ -228,16 +262,16 @@ function EventManagement({
                   <Button
                     variant="primary"
                     className="editAndDeleteButtons"
-                    onClick={() => {
-                      handleEdit(event.eventName);
-                    }}
+                    onClick={() => handleEdit(event.name ?? event.eventName)}
                   >
                     edit
                   </Button>
                   <Button
                     variant="primary"
                     className="editAndDeleteButtons"
-                    onClick={() => onClickDeleteButton(event.eventName)}
+                    onClick={() =>
+                      onClickDeleteButton(event.name ?? event.eventName)
+                    }
                   >
                     delete
                   </Button>
