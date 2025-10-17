@@ -1,5 +1,13 @@
+// Server/index.js
+const app = require("./app"); // ✅ Import the shared Express app
+const PORT = process.env.PORT || 5000;
+
+// Start the server
+app.listen(PORT, () => {
+  console.log(`server has started on port ${PORT}`);
+});
 const express = require("express");
-const app = express();
+
 const cors = require("cors");
 // const pool = require("./db");
 const bcrypt = require("bcrypt");
@@ -8,6 +16,9 @@ const profileRoutes = require("./routes/profileRoutes");
 const volunteerHistoryRoutes = require("./routes/volunteerHistoryRoutes");
 const notificationRoutes = require("./routes/inboxRoutes");
 const eventRoutes = require("./routes/eventRoutes");
+
+
+const app = express();
 
 //middleware
 
@@ -26,8 +37,3 @@ app.use("/history", volunteerHistoryRoutes);
 app.use("/notifications", notificationRoutes); 
 app.use("/events", eventRoutes);
 
-app.use("/event", eventRoutes);
-
-app.listen(5000, () => {
-  console.log("server has started on port 5000");
-});
