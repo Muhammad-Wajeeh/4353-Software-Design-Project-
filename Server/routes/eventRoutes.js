@@ -102,4 +102,46 @@ router.delete(
   }
 );
 
+router.get(
+  "/get/:eventName",
+  // authenticateToken,
+  // authorizeRoles("Admin", "Member"),
+  async (req, res) => {
+    var eventName = req.params.eventName;
+    console.log(eventName);
+    try {
+      const index = tempListOfEvents.findIndex(
+        (evt) => evt.eventName === eventName
+      );
+
+      res.json(tempListOfEvents[index]);
+    } catch (error) {
+      res.json("No Events Found");
+    }
+  }
+);
+
+router.put(
+  "/Edit/:eventName",
+  // authenticateToken,
+  // authorizeRoles("Admin", "Member"),
+  async (req, res) => {
+    const event = req.body;
+    console.log(event);
+    var eventName = req.params.eventName;
+    try {
+      const index = tempListOfEvents.findIndex(
+        (evt) => evt.eventName === eventName
+      );
+
+      // Merge old and new data safely
+      tempListOfEvents[index] = { ...tempListOfEvents[index], ...event };
+
+      res.json(tempListOfEvents[index]);
+    } catch (error) {
+      res.json("No Events Found");
+    }
+  }
+);
+
 module.exports = router;

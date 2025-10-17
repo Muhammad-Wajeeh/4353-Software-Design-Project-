@@ -1,6 +1,11 @@
 import { useState, useEffect } from "react";
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import { Form, Button, Card } from "react-bootstrap";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  useNavigate,
+} from "react-router-dom";
+import { Form, Button, Card, ListGroup } from "react-bootstrap";
 import Sidebar from "./Sidebar";
 
 function EventManagement({
@@ -78,6 +83,12 @@ function EventManagement({
     } catch (error) {
       console.log(error);
     }
+  };
+
+  const navigate = useNavigate();
+
+  const handleEdit = (eventName) => {
+    navigate(`/events/${encodeURIComponent(eventName)}`);
   };
 
   useEffect(() =>
@@ -203,9 +214,24 @@ function EventManagement({
             <Card style={{ width: "18rem" }}>
               <Card.Body>
                 <Card.Title>{event.eventName}</Card.Title>
+                <Card.Subtitle className="mb-2 text-muted">
+                  {event.eventLocation}
+                </Card.Subtitle>
+                <Card.Subtitle className="mb-2 text-muted">
+                  {event.eventDate}
+                </Card.Subtitle>
                 <Card.Text>{event.eventDescription}</Card.Text>
+              </Card.Body>
+
+              <Card.Body>
                 <div>
-                  <Button variant="primary" className="editAndDeleteButtons">
+                  <Button
+                    variant="primary"
+                    className="editAndDeleteButtons"
+                    onClick={() => {
+                      handleEdit(event.eventName);
+                    }}
+                  >
                     edit
                   </Button>
                   <Button

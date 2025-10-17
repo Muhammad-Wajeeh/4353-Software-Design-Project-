@@ -8,6 +8,7 @@ import EventManagement from "./Pages/EventManagement";
 import VolunteerHistory from "./Pages/VolunteerHistory";
 import VolunteerMatching from "./Pages/VolunteerMatching";
 import Sidebar from "./Pages/Sidebar";
+import EditEvent from "./Pages/EditEvent";
 
 function App() {
   const [count, setCount] = useState(0);
@@ -97,6 +98,8 @@ function App() {
             path="/VolunteerMatching"
             element={<VolunteerMatching></VolunteerMatching>}
           />
+
+          <Route path="/events/:eventName" element={<EditEvent />} />
         </Routes>
       </Router>
     </>
