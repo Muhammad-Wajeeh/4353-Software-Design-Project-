@@ -4,6 +4,9 @@
   padding: 2rem;
   text-align: center;
 }
+.badge.text-bg-light {
+  background: #f8f9fa;
+}
 
 .logo {
   height: 6em;
