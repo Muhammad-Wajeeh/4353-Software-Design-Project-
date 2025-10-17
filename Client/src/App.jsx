@@ -102,15 +102,9 @@ function App() {
             element={<VolunteerMatching></VolunteerMatching>}
           />
 
-          <Route path="/events/:eventName" element={<EditEvent />} />
-          <Route
-            path="/inbox"
-            element={<Inbox></Inbox>}
-          />
-          <Route
-            path="/events/:id"
-            element={<EventDetails></EventDetails>}
-          />
+          <Route path="/events/edit/:eventName" element={<EditEvent />} />
+          <Route path="/inbox" element={<Inbox></Inbox>} />
+          <Route path="/events/:id" element={<EventDetails></EventDetails>} />
           <Route
             path="/history/event/:eventId"
             element={<HistoryDetails></HistoryDetails>}

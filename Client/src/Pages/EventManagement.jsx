@@ -88,7 +88,7 @@ function EventManagement({
   const navigate = useNavigate();
 
   const handleEdit = (eventName) => {
-    navigate(`/events/${encodeURIComponent(eventName)}`);
+    navigate(`/events/edit/${encodeURIComponent(eventName)}`);
   };
 
   useEffect(() =>
