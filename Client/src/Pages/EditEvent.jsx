@@ -1,11 +1,11 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { Form, Button, Card } from "react-bootstrap";
+import { Form, Button } from "react-bootstrap";
 import Sidebar from "./Sidebar";
 
 function EditEvent() {
-  const { eventName } = useParams(); // get event name from route
-  const navigate = useNavigate(); // ✅ useNavigate instead of state
+  const { eventName } = useParams();
+  const navigate = useNavigate();
 
   const [event, setEvent] = useState(null);
 
@@ -13,7 +13,7 @@ function EditEvent() {
     e.preventDefault();
     try {
       const response = await fetch(
-        `http://localhost:5000/event/edit/${eventName}`,
+        `http://localhost:5000/event/edit/${encodeURIComponent(eventName)}`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -21,46 +21,62 @@ function EditEvent() {
         }
       );
       if (response.ok) {
+        alert("Event updated!");
         navigate("/eventmanagement");
+      } else {
+        alert("Update failed.");
       }
     } catch (err) {
       console.error(err);
+      alert("Update failed.");
     }
   };
 
   const fetchEvent = async () => {
-    const response = await fetch(
-      `http://localhost:5000/event/get/${eventName}`,
-      {
-        method: "GET",
-        headers: {
-          // Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      }
-    );
-    const data = await response.json();
-    const formattedDate = new Date(data.eventDate).toISOString().split("T")[0];
-    setEvent({
-      ...data,
-      eventRequiredSkills: Array.isArray(data.eventRequiredSkills)
-        ? data.eventRequiredSkills
-        : [data.eventRequiredSkills],
-    });
-    setEvent({ ...data, eventDate: formattedDate });
-    console.log(data);
+    try {
+      const response = await fetch(
+        `http://localhost:5000/event/get/${encodeURIComponent(eventName)}`,
+        { method: "GET", headers: { "Content-Type": "application/json" } }
+      );
+      if (!response.ok) throw new Error("Fetch failed");
+      const data = await response.json();
+
+      // data shape comes from the server alias in eventRoutes.js
+      const formattedDate = data.eventDate
+        ? new Date(data.eventDate).toISOString().split("T")[0]
+        : "";
+
+      setEvent({
+        eventName: data.eventName || "",
+        eventDescription: data.eventDescription || "",
+        eventLocation: data.eventLocation || "",
+        eventZipCode: data.eventZipCode || "",
+        eventRequiredSkills: Array.isArray(data.eventRequiredSkills)
+          ? data.eventRequiredSkills
+          : data.eventRequiredSkills
+          ? [data.eventRequiredSkills]
+          : [],
+        eventUrgency: data.eventUrgency || "",
+        eventDate: formattedDate,
+      });
+    } catch (e) {
+      console.error(e);
+      alert("Could not load event.");
+      navigate("/eventmanagement");
+    }
   };
 
   useEffect(() => {
     fetchEvent();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventName]);
 
   if (!event) return <p>Loading...</p>;
 
   return (
     <>
-      <Sidebar></Sidebar>
-      <Form onSubmit={onSubmitForm}>
+      <Sidebar />
+      <Form onSubmit={onSubmitForm} className="p-3">
         <Form.Group className="mb-3" controlId="emEventName">
           <Form.Label>Event Name</Form.Label>
           <Form.Control
@@ -69,25 +85,29 @@ function EditEvent() {
             maxLength={100}
             required
             name="eventName"
-            value={event?.eventName || ""} // avoid undefined errors
+            value={event.eventName}
             readOnly
-            onChange={(e) => setEvent({ ...event, eventName: e.target.value })}
+            onChange={(e) =>
+              setEvent((prev) => ({ ...prev, eventName: e.target.value }))
+            }
           />
           <Form.Text muted>Maximum 100 characters.</Form.Text>
         </Form.Group>
 
         <Form.Group className="mb-3" controlId="emDescription">
-          {" "}
-          <Form.Label>Event Description</Form.Label>{" "}
+          <Form.Label>Event Description</Form.Label>
           <Form.Control
             as="textarea"
             rows={5}
             placeholder="Describe the event..."
             required
             name="description"
-            value={event?.eventDescription || ""} // avoid undefined errors
+            value={event.eventDescription}
             onChange={(e) =>
-              setEvent({ ...event, eventDescription: e.target.value })
+              setEvent((prev) => ({
+                ...prev,
+                eventDescription: e.target.value,
+              }))
             }
           />
         </Form.Group>
@@ -100,9 +120,9 @@ function EditEvent() {
             placeholder="Enter location (address or venue)"
             required
             name="location"
-            value={event?.eventLocation || ""} // avoid undefined errors
+            value={event.eventLocation}
             onChange={(e) =>
-              setEvent({ ...event, eventLocation: e.target.value })
+              setEvent((prev) => ({ ...prev, eventLocation: e.target.value }))
             }
           />
         </Form.Group>
@@ -113,10 +133,10 @@ function EditEvent() {
             type="number"
             placeholder="Enter Zip/Postal Code"
             required
-            name="Zip Code"
-            value={event?.eventZipCode || ""} // avoid undefined errors
+            name="zip"
+            value={event.eventZipCode}
             onChange={(e) =>
-              setEvent({ ...event, eventZipCode: e.target.value })
+              setEvent((prev) => ({ ...prev, eventZipCode: e.target.value }))
             }
           />
         </Form.Group>
@@ -128,19 +148,15 @@ function EditEvent() {
             required
             name="requiredSkills"
             style={{ minHeight: 140 }}
-            value={
-              Array.isArray(event?.eventRequiredSkills)
-                ? event.eventRequiredSkills
-                : []
-            }
+            value={event.eventRequiredSkills}
             onChange={(e) =>
-              setEvent({
-                ...event,
+              setEvent((prev) => ({
+                ...prev,
                 eventRequiredSkills: Array.from(
                   e.target.selectedOptions,
                   (option) => option.value
                 ),
-              })
+              }))
             }
           >
             <option value="First Aid">First Aid</option>
@@ -161,9 +177,9 @@ function EditEvent() {
           <Form.Select
             required
             name="urgency"
-            value={event?.eventUrgency || ""} // avoid undefined errors
+            value={event.eventUrgency}
             onChange={(e) =>
-              setEvent({ ...event, eventUrgency: e.target.value })
+              setEvent((prev) => ({ ...prev, eventUrgency: e.target.value }))
             }
           >
             <option value="">Select urgency...</option>
@@ -180,8 +196,10 @@ function EditEvent() {
             type="date"
             required
             name="eventDate"
-            value={event?.eventDate || ""} // avoid undefined errors
-            onChange={(e) => setEvent({ ...event, eventDate: e.target.value })}
+            value={event.eventDate}
+            onChange={(e) =>
+              setEvent((prev) => ({ ...prev, eventDate: e.target.value }))
+            }
           />
         </Form.Group>
 
