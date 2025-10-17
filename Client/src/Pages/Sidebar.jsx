@@ -17,30 +17,29 @@ function Sidebar() {
   const userId = "u1"; // swap when auth is wired
 
   useEffect(() => {
-  const fetchUnread = async () => {
-    try {
-      const { data } = await axios.get(
-        `http://localhost:5000/notifications/${userId}`,
-        { params: { onlyUnread: true } }
-      );
-      setUnreadNotifs((data.notifications || []).length);
-    } catch (_) {
-      setUnreadNotifs(0);
-    }
-  };
+    const fetchUnread = async () => {
+      try {
+        const { data } = await axios.get(
+          `http://localhost:5000/notifications/${userId}`,
+          { params: { onlyUnread: true } }
+        );
+        setUnreadNotifs((data.notifications || []).length);
+      } catch (_) {
+        setUnreadNotifs(0);
+      }
+    };
 
-  fetchUnread();
+    fetchUnread();
 
-  // 🔔 listen for update events from Inbox
-  const handleRefresh = () => fetchUnread();
-  window.addEventListener("notificationsUpdated", handleRefresh);
+    // 🔔 listen for update events from Inbox
+    const handleRefresh = () => fetchUnread();
+    window.addEventListener("notificationsUpdated", handleRefresh);
 
-  // Cleanup
-  return () => {
-    window.removeEventListener("notificationsUpdated", handleRefresh);
-  };
-}, [location.pathname]);
-
+    // Cleanup
+    return () => {
+      window.removeEventListener("notificationsUpdated", handleRefresh);
+    };
+  }, [location.pathname]);
 
   return (
     <div className="sidebar">
@@ -49,9 +48,13 @@ function Sidebar() {
       </div>
 
       <Nav className="flex-column">
-        <Nav.Link as={Link} to="/eventmanagement">Event Management</Nav.Link>
+        <Nav.Link as={Link} to="/eventmanagement">
+          Event Management
+        </Nav.Link>
 
-        <Nav.Link as={Link} to="/profilemanagement">Profile Management</Nav.Link>
+        <Nav.Link as={Link} to="/profilemanagement">
+          Profile Management
+        </Nav.Link>
 
         <Nav.Link as={Link} to="/eventlist">
           Event List{" "}
@@ -80,12 +83,27 @@ function Sidebar() {
           )}
         </Nav.Link>
 
-        <Nav.Link as={Link} to="/VolunteerMatching">Volunteer Matching</Nav.Link>
+        <Nav.Link as={Link} to="/VolunteerMatching">
+          Volunteer Matching
+        </Nav.Link>
 
-        <Nav.Link as={Link} to="/VolunteerHistory">Volunteer History</Nav.Link>
+        <Nav.Link as={Link} to="/VolunteerHistory">
+          Volunteer History
+        </Nav.Link>
 
-        <Nav.Link as={Link} to="/settings">Settings</Nav.Link>
-        <Nav.Link as={Link} to="/logout">Log Out</Nav.Link>
+        <Nav.Link as={Link} to="/settings">
+          Settings
+        </Nav.Link>
+
+        <Nav.Link as={Link} to="/login">
+          Register
+        </Nav.Link>
+        <Nav.Link as={Link} to="/login">
+          Login
+        </Nav.Link>
+        <Nav.Link as={Link} to="/logout">
+          Log Out
+        </Nav.Link>
       </Nav>
     </div>
   );
