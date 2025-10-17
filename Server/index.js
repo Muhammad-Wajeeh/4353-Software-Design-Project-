@@ -18,7 +18,7 @@ const notificationRoutes = require("./routes/inboxRoutes");
 const eventRoutes = require("./routes/eventRoutes");
 
 
-const app = express();
+
 
 //middleware
 
