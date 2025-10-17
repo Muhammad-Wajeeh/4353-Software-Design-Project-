@@ -26,6 +26,8 @@ app.use("/history", volunteerHistoryRoutes);
 app.use("/notifications", notificationRoutes); 
 app.use("/events", eventRoutes);
 
+app.use("/event", eventRoutes);
+
 app.listen(5000, () => {
   console.log("server has started on port 5000");
 });

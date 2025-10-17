@@ -8,6 +8,7 @@ import EventManagement from "./Pages/EventManagement";
 import VolunteerHistory from "./Pages/VolunteerHistory";
 import VolunteerMatching from "./Pages/VolunteerMatching";
 import Sidebar from "./Pages/Sidebar";
+import EditEvent from "./Pages/EditEvent";
 import Inbox from "./Pages/Inbox";
 import EventDetails from "./Pages/EventDetails";
 import HistoryDetails from "./Pages/HistoryDetails";
@@ -21,6 +22,15 @@ function App() {
   const [password, setPassword] = useState("");
   const [loginUsername, setLoginUsername] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
+  const [eventName, setEventName] = useState("");
+  const [eventDescription, setEventDescription] = useState("");
+  const [eventLocation, setEventLocation] = useState("");
+  const [eventZipCode, setEventZipCode] = useState("");
+  const [eventRequiredSkills, setEventRequiredSkills] = useState("");
+  const [eventUrgency, setEventUrgency] = useState("");
+  const [eventDate, setEventDate] = useState("");
+  const [eventsList, setEventsList] = useState([]);
+
   return (
     <>
       <Router>
@@ -51,7 +61,7 @@ function App() {
                 setUsername={setUsername}
                 password={password}
                 setPassword={setPassword}
-              ></Register>
+              />
             }
           />
           <Route
@@ -61,7 +71,26 @@ function App() {
 
           <Route
             path="/EventManagement"
-            element={<EventManagement></EventManagement>}
+            element={
+              <EventManagement
+                eventName={eventName}
+                setEventName={setEventName}
+                eventDescription={eventDescription}
+                setEventDescription={setEventDescription}
+                eventLocation={eventLocation}
+                setEventLocation={setEventLocation}
+                eventZipCode={eventZipCode}
+                setEventZipCode={setEventZipCode}
+                eventRequiredSkills={eventRequiredSkills}
+                setEventRequiredSkills={setEventRequiredSkills}
+                eventUrgency={eventUrgency}
+                setEventUrgency={setEventUrgency}
+                eventDate={eventDate}
+                setEventDate={setEventDate}
+                eventsList={eventsList}
+                setEventsList={setEventsList}
+              />
+            }
           />
 
           <Route
@@ -72,6 +101,8 @@ function App() {
             path="/VolunteerMatching"
             element={<VolunteerMatching></VolunteerMatching>}
           />
+
+          <Route path="/events/:eventName" element={<EditEvent />} />
           <Route
             path="/inbox"
             element={<Inbox></Inbox>}
