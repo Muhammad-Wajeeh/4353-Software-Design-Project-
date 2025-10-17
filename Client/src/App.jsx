@@ -12,13 +12,46 @@ import Inbox from "./Pages/Inbox";
 
 function App() {
   const [count, setCount] = useState(0);
+  const [memberFirstName, setMemberFirstName] = useState("");
+  const [memberLastName, setMemberLastName] = useState("");
+  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [loginUsername, setLoginUsername] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
   return (
     <>
       <Router>
         <Routes>
           <Route path="/" element={<Sidebar></Sidebar>} />
-          <Route path="/Login" element={<Login></Login>} />
-          <Route path="/Register" element={<Register></Register>} />
+          <Route
+            path="/Login"
+            element={
+              <Login
+                loginUsername={loginUsername}
+                setLoginUsername={setLoginUsername}
+                loginPassword={loginPassword}
+                setLoginPassword={setLoginPassword}
+              ></Login>
+            }
+          />
+          <Route
+            path="/Register"
+            element={
+              <Register
+                memberFirstName={memberFirstName}
+                setMemberFirstName={setMemberFirstName}
+                memberLastName={memberLastName}
+                setMemberLastName={setMemberLastName}
+                email={email}
+                setEmail={setEmail}
+                username={username}
+                setUsername={setUsername}
+                password={password}
+                setPassword={setPassword}
+              ></Register>
+            }
+          />
           <Route
             path="/ProfileManagement"
             element={<ProfileManagement></ProfileManagement>}
