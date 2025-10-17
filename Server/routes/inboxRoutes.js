@@ -28,13 +28,51 @@ router.post("/", (req, res) => {
   if (!isNonEmptyString(title)) errors.push("title is required");
   if (!isNonEmptyString(message)) errors.push("message is required");
 
+  // For "assignment" notifications, require meta.eventId so we can dedupe.
+  if (type === "assignment") {
+    if (!meta || !isNonEmptyString(meta.eventId)) {
+      errors.push("meta.eventId is required for assignment notifications");
+    }
+  }
+
   if (errors.length) return res.status(400).json({ errors });
+
+  // 🔒 Duplicate guard: prevent multiple "assignment" notifs for same (userId, eventId)
+  if (type === "assignment" && meta?.eventId) {
+    const existing = notifications.find(
+      (n) =>
+        n.userId === userId &&
+        n.type === "assignment" &&
+        n.meta &&
+        n.meta.eventId === meta.eventId
+    );
+
+    if (existing) {
+      // Already requested/joined this event
+      return res
+        .status(409) // Conflict
+        .json({
+          message: "You have already requested to join this event.",
+          notification: existing,
+        });
+    }
+  }
 
   const id = "n" + Math.random().toString(36).slice(2, 8);
   const createdAt = new Date().toISOString();
 
-  const notif = { id, userId, type, title, message, createdAt, read: false, meta: meta || {} };
+  const notif = {
+    id,
+    userId,
+    type,
+    title,
+    message,
+    createdAt,
+    read: false,
+    meta: meta || {},
+  };
   notifications.push(notif);
+
   return res.status(201).json({ notification: notif });
 });
 

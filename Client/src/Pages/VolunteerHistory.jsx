@@ -5,6 +5,7 @@ import Sidebar from "./Sidebar";
 import Form from "react-bootstrap/Form";
 import ButtonGroup from "react-bootstrap/ButtonGroup";
 import Button from "react-bootstrap/Button";
+import { Link } from "react-router-dom";
 
 function VolunteerHistory() {
   const userId = "u1"; // mock user id (swap when you wire auth)
@@ -164,7 +165,9 @@ function VolunteerHistory() {
               <tbody>
                 {filtered.map((ev, index) => (
                   <tr key={index}>
-                    <td>{ev.eventName}</td>
+                    <td>
+                      <Link to={`/history/event/${ev.eventId}`}>{ev.eventName}</Link>
+                    </td>
                     <td>{ev.organization}</td>
                     <td>{ev.date}</td>
                     <td>{ev.hours}</td>
