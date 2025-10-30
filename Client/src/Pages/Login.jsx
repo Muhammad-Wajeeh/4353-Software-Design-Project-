@@ -39,9 +39,6 @@ function Login({
         const data = await response.json();
         localStorage.setItem("token", data.token);
       }
-      // } else {
-      //   console.error("Login Failed");
-      // }
     } catch (err) {
       console.log(err);
     }

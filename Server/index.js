@@ -1,24 +1,18 @@
-// Server/index.js
-const app = require("./app"); // ✅ Import the shared Express app
+const app = require("./app"); 
 const PORT = process.env.PORT || 5000;
 
-// Start the server
 app.listen(PORT, () => {
   console.log(`server has started on port ${PORT}`);
 });
-const express = require("express");
 
+const express = require("express");
 const cors = require("cors");
-// const pool = require("./db");
-const bcrypt = require("bcrypt");
+
 const authRoutes = require("./routes/authRoutes");
 const profileRoutes = require("./routes/profileRoutes");
 const volunteerHistoryRoutes = require("./routes/volunteerHistoryRoutes");
 const notificationRoutes = require("./routes/inboxRoutes");
 const eventRoutes = require("./routes/eventRoutes");
-
-
-
 
 //middleware
 
@@ -34,7 +28,6 @@ app.get("/", (req, res) => {
 app.use("/auth", authRoutes);
 app.use("/profile", profileRoutes);
 app.use("/history", volunteerHistoryRoutes);
-app.use("/notifications", notificationRoutes); 
+app.use("/notifications", notificationRoutes);
 app.use("/events", eventRoutes);
-app.use("/event", eventRoutes);  // legacy compatibility (your UI calls these)
-
+app.use("/event", eventRoutes); // legacy compatibility (your UI calls these)

@@ -30,8 +30,8 @@ function Register({
 
     try {
       const body = {
-        memberFirstName: memberFirstName,
-        memberLastName: memberLastName,
+        firstName: memberFirstName,
+        lastName: memberLastName,
         username: username,
         email: email,
         password: password,
