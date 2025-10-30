@@ -95,7 +95,7 @@ function Sidebar() {
           Settings
         </Nav.Link>
 
-        <Nav.Link as={Link} to="/login">
+        <Nav.Link as={Link} to="/register">
           Register
         </Nav.Link>
         <Nav.Link as={Link} to="/login">

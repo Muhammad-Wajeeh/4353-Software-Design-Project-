@@ -11,10 +11,14 @@ require("dotenv").config();
 // Use provided secret in prod; safe fallback for tests/dev
 const JWT_SECRET = process.env.JWT_SECRET || "test_secret_fallback";
 
-
 // POST /auth/register
 router.post("/register", async (req, res) => {
   const { firstName, lastName, username, email, password } = req.body || {};
+
+  var userAlreadyExists = await doesUserExist(username, password);
+
+  if (userAlreadyExists)
+    return res.status(400).json({ error: "Username or Email Already Exists" });
 
   try {
     const saltRounds = 10;
@@ -34,12 +38,15 @@ router.post("/register", async (req, res) => {
 
 // POST /auth/login
 router.post("/login", async (req, res) => {
+  console.log("login route hit");
   const { username, password } = req.body;
   try {
     const queryResult = await pool.query(
       "SELECT password FROM userprofiles WHERE username = $1",
       [username]
     );
+
+    console.log("Query result:", queryResult.rows);
 
     if (queryResult.rows.length === 0) {
       return res.status(404).json({ error: "User not found" });
@@ -67,6 +74,15 @@ router.post("/login", async (req, res) => {
     res.status(500);
   }
 });
+
+async function doesUserExist(username, email) {
+  const existingUser = await pool.query(
+    "SELECT * FROM userprofiles WHERE username = $1 OR emailaddress = $2",
+    [username, email]
+  );
+
+  if (existingUser.rows.length > 0) return true;
+}
 
 // Middleware exports (if you use them)
 function authenticateToken(req, res, next) {
