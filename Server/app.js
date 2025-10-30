@@ -1,4 +1,5 @@
 // Server/app.js
+require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 
@@ -8,6 +9,7 @@ const profileRoutes = require("./routes/profileRoutes");
 const volunteerHistoryRoutes = require("./routes/volunteerHistoryRoutes");
 const notificationRoutes = require("./routes/inboxRoutes"); // your notifications router
 const eventRoutes = require("./routes/eventRoutes");
+const legacyEventRoutes = require("./routes/eventLegacyRoutes"); // <-- new
 
 const app = express();
 
@@ -24,5 +26,6 @@ app.use("/profile", profileRoutes);
 app.use("/history", volunteerHistoryRoutes);
 app.use("/notifications", notificationRoutes);
 app.use("/events", eventRoutes);
+app.use("/event", legacyEventRoutes); // <-- add this line
 
 module.exports = app;
