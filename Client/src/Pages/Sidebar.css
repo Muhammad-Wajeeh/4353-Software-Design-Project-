@@ -1,7 +1,7 @@
 /* ===== APP PADDING — prevents overlap ===== */
 body {
-  --sidebar-space: 232px;               /* JS updates this on toggle */
-  --rail: 72px;                          /* collapsed width */
+  --sidebar-space: 232px;   /* updated by JS: 232px open, 72px collapsed */
+  --rail: 72px;             /* collapsed width */
   padding-left: var(--sidebar-space);
   transition: padding-left 200ms ease;
 }
@@ -18,11 +18,12 @@ body {
   display: flex;
   flex-direction: column;
   box-shadow: 3px 0 12px rgba(0,0,0,0.15);
-  overflow: hidden;                     /* clip internals cleanly */
-  transition: width 160ms ease;         /* quick + polished */
+  /* IMPORTANT: allow tooltips to show outside */
+  overflow: visible;
+  transition: width 160ms ease;
 }
 
-/* header inside the sidebar (so it never covers page) */
+/* Header */
 .sidebar-header {
   display: flex;
   align-items: center;
@@ -34,75 +35,72 @@ body {
 
 .collapse-btn {
   width: 34px; height: 34px;
-  border: 0;
-  border-radius: 8px;
+  border: 0; border-radius: 8px;
   background: rgba(255,255,255,0.15);
-  color: #fff;
-  font-weight: 700;
-  cursor: pointer;
+  color: #fff; font-weight: 700; cursor: pointer;
   transition: background 120ms ease;
 }
 .collapse-btn:hover { background: rgba(255,255,255,0.25); }
 
-/* ===== NAV LIST ===== */
+/* Nav list */
 .sidebar-nav {
   display: flex;
   flex-direction: column;
-  gap: 6px;                             /* clean even spacing */
+  gap: 6px;                        /* uniform vertical rhythm */
   padding: 8px 8px 12px;
   overflow-y: auto;
   scrollbar-width: none;
 }
 .sidebar-nav::-webkit-scrollbar { display: none; }
 
-/* item uses grid: 24px icon + label area + optional badge */
+/* Items: stable grid (icon | label | badge) — columns NEVER change */
 .nav-item {
-  display: grid !important;
-  grid-template-columns: 24px minmax(0,1fr) auto;
+  display: grid;
+  grid-template-columns: 24px minmax(0,1fr) auto; /* grid constant in both states */
   align-items: center;
   column-gap: 10px;
-  height: 44px;                         /* uniform height */
+  height: 44px;                    /* consistent height */
   padding: 0 10px;
   border-radius: 9px;
-  color: #fff !important;
+  color: #fff;
   text-decoration: none;
   transition: background 120ms ease, color 120ms ease;
 }
-.nav-item:hover { background: #fff; color: #1c3ec3 !important; }
+.nav-item:hover { background: #fff; color: #1c3ec3; }
+.nav-item.active { background: rgba(255,255,255,0.18); }
+.nav-item .counter { margin-left: auto; }
 
-.icon { display: inline-flex; align-items: center; justify-content: center; }
-.counter { margin-left: auto; }
+/* Icons always visible */
+.icon { width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; }
+.icon svg { width: 18px; height: 18px; display: block; }
 
-/* The label sits inside a wrap that SNAPS width between states (no animation) */
-.label-wrap {
-  overflow: hidden;                     /* prevents stretching visuals */
-  /* no transitions here: width will snap immediately when state changes */
-}
+/* Label: wrapped so width snaps (no stretching), only text fades */
+.label-wrap { overflow: hidden; white-space: nowrap; }
 .label {
   opacity: 1;
-  transition: opacity 140ms ease;       /* fade only */
+  transition: opacity 140ms ease;
 }
 
-/* ===== COLLAPSED ===== */
+/* Add a slight delay so labels fade AFTER the panel expands (prevents seeing text appear mid-animation) */
+.sidebar:not(.collapsed) .label { transition-delay: 120ms; }
+
+/* Collapsed state */
 .sidebar.collapsed { width: var(--rail); }
 
-/* When collapsed: hide label by snapping the wrap to 0 width, fade text */
+/* When collapsed: snap the label area closed instantly, fade text out */
 .sidebar.collapsed .label-wrap { width: 0 !important; }
-.sidebar:not(.collapsed) .label-wrap { width: auto !important; } /* snap instantly */
-.sidebar.collapsed .label { opacity: 0; pointer-events: none; }
+.sidebar:not(.collapsed) .label-wrap { width: auto !important; }
+.sidebar.collapsed .label { opacity: 0; pointer-events: none; transition-delay: 0ms; }
 
-/* Keep grid layout stable when collapsed */
-.sidebar.collapsed .nav-item {
-  grid-template-columns: 24px 0px auto; /* label column is 0px; no stretch */
-  justify-content: center;
-}
+/* Keep grid consistent when collapsed (do NOT change columns) */
+/* (No .sidebar.collapsed .nav-item grid change — avoids jank) */
 
-/* Tooltips on hover (only when collapsed) */
+/* Tooltips on hover — visible when collapsed */
 .sidebar.collapsed .nav-item { position: relative; }
 .sidebar.collapsed .nav-item::after {
   content: attr(data-label);
   position: absolute;
-  left: calc(var(--rail) + 4px);
+  left: calc(var(--rail) + 6px);
   top: 50%;
   transform: translateY(-50%);
   white-space: nowrap;
