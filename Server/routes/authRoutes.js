@@ -31,16 +31,14 @@ router.post("/register", async (req, res) => {
 
 // POST /auth/login
 router.post("/login", async (req, res) => {
-  const { username, password } = req.body || {};
+  const { username, password } = req.body;
   try {
-    const q = `
-      SELECT id, username, password
-      FROM userprofiles
-      WHERE username = $1
-      LIMIT 1
-    `;
-    const { rows } = await pool.query(q, [username]);
-    if (rows.length === 0) {
+    const queryResult = await pool.query(
+      "SELECT password, id FROM userprofiles WHERE username = $1",
+      [username]
+    );
+
+    if (queryResult.rows.length === 0) {
       return res.status(404).json({ error: "User not found" });
     }
     const user = rows[0];
@@ -48,12 +46,17 @@ router.post("/login", async (req, res) => {
     const ok = await bcrypt.compare(password, user.password);
     if (!ok) return res.status(401).json({ error: "Invalid credentials" });
 
-    // 🔐 sign BOTH id and username
-    const token = jwt.sign(
-      { id: user.id, username: user.username },
-      JWT_SECRET,
-      { expiresIn: "7d" }
+    const id = queryResult.rows[0].id;
+    const storedHashedPassword = queryResult.rows[0].password;
+    const isPasswordValid = await bcrypt.compare(
+      password,
+      storedHashedPassword
     );
+
+    if (isPasswordValid == true) {
+      const token = jwt.sign({ username: username, id: id }, JWT_SECRET, {
+        expiresIn: "1h",
+      });
 
     res.json({ message: "Login Successful", token });
   } catch (err) {
@@ -62,10 +65,21 @@ router.post("/login", async (req, res) => {
   }
 });
 
+
+async function doesUserExist(username, email) {
+  const existingUser = await pool.query(
+    "SELECT * FROM userprofiles WHERE username = $1 OR emailaddress = $2",
+    [username, email]
+  );
+
+  if (existingUser.rows.length > 0) return true;
+}
+
 // GET /auth/me  (Authorization: Bearer <token>)
 router.get("/me", authenticate, (req, res) => {
   const { id, username } = req.user || {};
   res.json({ id, username });
 });
+
 
 module.exports = router;

@@ -8,13 +8,28 @@ app.listen(PORT, () => {
   console.log(`✅ Server has started on port ${PORT}`);
 });
 
-// optional: quick DB check
-const pool = require("./DB");
-(async () => {
-  try {
-    const { rows } = await pool.query("SELECT NOW()");
-    console.log("🗄️  DB connected:", rows[0].now);
-  } catch (e) {
-    console.error("❌ DB connection failed:", e.message);
-  }
-})();
+const express = require("express");
+const cors = require("cors");
+
+const authRoutes = require("./routes/authRoutes");
+const profileRoutes = require("./routes/profileRoutes");
+const volunteerHistoryRoutes = require("./routes/volunteerHistoryRoutes");
+const notificationRoutes = require("./routes/inboxRoutes");
+const eventRoutes = require("./routes/eventRoutes");
+
+//middleware
+
+app.use(cors());
+app.use(express.json());
+
+//routes
+
+app.get("/", (req, res) => {
+  res.send("API is running");
+});
+
+app.use("/auth", authRoutes);
+app.use("/profile", profileRoutes);
+app.use("/history", volunteerHistoryRoutes);
+app.use("/notifications", notificationRoutes);
+app.use("/event", eventRoutes);

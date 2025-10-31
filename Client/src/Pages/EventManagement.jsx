@@ -18,7 +18,8 @@ function EventManagement(props) {
   const setEventName = props.setEventName ?? setLocalEventName;
 
   const eventDescription = props.eventDescription ?? localEventDescription;
-  const setEventDescription = props.setEventDescription ?? setLocalEventDescription;
+  const setEventDescription =
+    props.setEventDescription ?? setLocalEventDescription;
 
   const eventLocation = props.eventLocation ?? localEventLocation;
   const setEventLocation = props.setEventLocation ?? setLocalEventLocation;
@@ -57,7 +58,10 @@ function EventManagement(props) {
 
       const response = await fetch("http://localhost:5000/event/create", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
         body: JSON.stringify(body),
       });
 
@@ -84,17 +88,28 @@ function EventManagement(props) {
 
   const getEvents = async () => {
     try {
-      const response = await fetch("http://localhost:5000/event/getall", {
-        method: "GET",
-        headers: { "Content-Type": "application/json" },
-      });
+      const response = await fetch(
+        "http://localhost:5000/event/getAllForThisUser",
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        }
+      );
+
       if (!response.ok) throw new Error("Failed to fetch events");
+
       const json = await response.json();
-      // server returns { events: [...] }
-      setEventsList(Array.isArray(json.events) ? json.events : []);
+
+      // Server returns { events: [...] } → extract safely
+      const eventsArray = Array.isArray(json.events) ? json.events : [];
+
+      setEventsList(eventsArray);
     } catch (error) {
-      console.error(error);
-      setEventsList([]); // never let it be non-array
+      console.error("Error fetching events:", error);
+      setEventsList([]); // ensures it never breaks render
     }
   };
 

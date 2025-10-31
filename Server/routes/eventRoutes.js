@@ -1,220 +1,288 @@
 const express = require("express");
 const router = express.Router();
-const pool = require("../DB");        // <- Option B: keep DB.js
+const pool = require("../DB");
+const authenticateToken = require("./authenticator");
 
-// --- helpers -------------------------------------------------
-const serializeSkills = (arr) =>
-  Array.isArray(arr) ? arr.join(",") : (arr ?? "");
-
-const parseSkills = (s) =>
-  (s ? String(s).split(",").map(v => v.trim()).filter(Boolean) : []);
-
-const dbRowToEvent = (r) => ({
-  id: r.id,
-  name: r.name,
-  description: r.description || "",
-  location: r.location || "",
-  zip: r.zipcode || "",
-  requiredSkills: parseSkills(r.requiredskills),
-  urgency: r.urgency ?? 0,
-  date: r.date,                         // keep whatever type your column returns
-  status: "Open",                       // not in DB; preserve mock shape
-  capacity: 0,                          // not in DB; preserve mock shape
-  organization: r.organization || "VolunteerHub",
-  hours: r.hours ?? 0,
+router.get("/", (req, res) => {
+  res.status(200).json({ events });
 });
 
-// --- Existing endpoints --------------------------------------
-
-// GET /events -> { events: [...] }
-router.get("/", async (_req, res) => {
+router.get("/getall", async (req, res) => {
   try {
-    const { rows } = await pool.query(
-      `SELECT id, name, description, location, zipcode, requiredskills, urgency, date, organization, hours
-         FROM events
-        ORDER BY date DESC, id DESC`
-    );
-    res.status(200).json({ events: rows.map(dbRowToEvent) });
-  } catch (e) {
-    console.error("GET /events error:", e);
-    res.status(500).json({ message: "Server error" });
+    const result = await pool.query("SELECT * FROM events ORDER BY id ASC");
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: "No events found" });
+    }
+
+    const events = result.rows.map((ev) => ({
+      eventName: ev.name,
+      eventDescription: ev.description,
+      eventLocation: ev.location,
+      eventZipcode: ev.zipcode,
+      eventRequiredSkills: ev.requiredskills,
+      eventUrgency: ev.urgency,
+      eventDate: ev.date,
+      organization: ev.organization,
+      hours: ev.hours,
+    }));
+
+    res.status(200).json({ events });
+  } catch (err) {
+    console.error("Error fetching all events:", err.message);
+    res.status(500).json({ error: "Server error while fetching events" });
   }
 });
 
-// GET /events/:id -> { event }
-router.get("/:id", async (req, res) => {
-  try {
-    const { id } = req.params;
-    const q = await pool.query(
-      `SELECT id, name, description, location, zipcode, requiredskills, urgency, date, organization, hours
-         FROM events
-        WHERE id = $1`,
-      [id]
-    );
-    if (!q.rowCount) return res.status(404).json({ message: "Event not found" });
-    res.status(200).json({ event: dbRowToEvent(q.rows[0]) });
-  } catch (e) {
-    console.error("GET /events/:id error:", e);
-    res.status(500).json({ message: "Server error" });
-  }
-});
-
-// ----------------------------------------------------
-// Aliases to support current frontend client endpoints
-// ----------------------------------------------------
-
-// GET /event/getall  -> { events }
-router.get("/event/getall", async (_req, res) => {
-  try {
-    const { rows } = await pool.query(
-      `SELECT id, name, description, location, zipcode, requiredskills, urgency, date, organization, hours
-         FROM events
-        ORDER BY date DESC, id DESC`
-    );
-    res.status(200).json({ events: rows.map(dbRowToEvent) });
-  } catch (e) {
-    console.error("GET /event/getall error:", e);
-    res.status(500).json({ message: "Server error" });
-  }
-});
-
-// POST /event/create  (body: client form shape)
-router.post("/event/create", async (req, res) => {
+router.post("/create", authenticateToken, async (req, res) => {
   try {
     const {
       eventName,
       eventDescription,
       eventLocation,
       eventZipCode,
-      eventRequiredSkills = [],
+      eventRequiredSkills,
       eventUrgency,
       eventDate,
     } = req.body || {};
 
+    // Basic validation
     if (!eventName || !eventDate) {
-      return res.status(400).json({ message: "eventName and eventDate are required" });
+      return res
+        .status(400)
+        .json({ message: "eventName and eventDate are required" });
     }
 
-    const ins = await pool.query(
-      `INSERT INTO events (name, description, location, zipcode, requiredskills, urgency, date, organization, hours)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-       RETURNING id, name, description, location, zipcode, requiredskills, urgency, date, organization, hours`,
+    var eventUrgencyNumberForm = 0;
+
+    if (eventUrgency == "Critical") eventUrgencyNumberForm = 3;
+    else if (eventUrgency == "High") eventUrgencyNumberForm = 2;
+    else if (eventUrgency == "Medium") eventUrgencyNumberForm = 1;
+    else if (eventUrgency == "Low") eventUrgencyNumberForm = 0;
+
+    const queryResult = await pool.query(
+      `INSERT INTO events (name, description, location, zipcode, requiredskills, urgency, date, creatorid )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
       [
         eventName,
-        eventDescription || "",
-        eventLocation || "",
-        eventZipCode || "",
-        serializeSkills(eventRequiredSkills),
-        eventUrgency ?? 0,
+        eventDescription,
+        eventLocation,
+        eventZipCode,
+        eventRequiredSkills,
+        eventUrgencyNumberForm,
         eventDate,
-        "VolunteerHub",
-        0,
+        req.user.id, // comes
       ]
     );
+  } catch (err) {
+    postgresqlUniqueViolationErrorCode = "23505";
+    if (err.code == postgresqlUniqueViolationErrorCode)
+      res.status(400).json({ error: "Event name already exists" });
 
-    // optional: return refreshed list like your mock did
-    const all = await pool.query(
-      `SELECT id, name, description, location, zipcode, requiredskills, urgency, date, organization, hours
-         FROM events
-        ORDER BY date DESC, id DESC`
+    res.status(500);
+    console.log(err);
+  }
+
+  return res.status(201).json("Event Created");
+});
+
+router.delete("/delete", async (req, res) => {
+  try {
+    const { eventName } = req.body;
+
+    // Validation
+    if (!eventName) {
+      return res.status(400).json({ error: "eventName is required" });
+    }
+
+    // Check if event exists
+    const existingEvent = await pool.query(
+      "SELECT * FROM events WHERE name = $1",
+      [eventName]
     );
 
-    return res
-      .status(201)
-      .json({ event: dbRowToEvent(ins.rows[0]), events: all.rows.map(dbRowToEvent) });
-  } catch (e) {
-    console.error("POST /event/create error:", e);
-    res.status(500).json({ message: "Server error" });
+    if (existingEvent.rows.length === 0) {
+      return res.status(404).json({ error: "Event not found" });
+    }
+
+    // Delete the event
+    await pool.query("DELETE FROM events WHERE name = $1", [eventName]);
+
+    return res.status(200).json({
+      message: `Event '${eventName}' deleted successfully`,
+    });
+  } catch (err) {
+    console.error("Error deleting event:", err);
+    res.status(500).json({ error: "Server error while deleting event" });
   }
 });
 
-// DELETE /event/delete  (body: { eventName })
-router.delete("/event/delete", async (req, res) => {
+// GET /event/getAllForThisUser
+router.get("/getAllForThisUser", authenticateToken, async (req, res) => {
   try {
-    const { eventName } = req.body || {};
-    if (!eventName) return res.status(400).json({ message: "eventName required" });
+    const creatorId = req.user.id; // comes from the JWT payload
 
-    const del = await pool.query(`DELETE FROM events WHERE name = $1`, [eventName]);
-    if (!del.rowCount) return res.status(404).json({ message: "Event not found" });
-
-    const all = await pool.query(
-      `SELECT id, name, description, location, zipcode, requiredskills, urgency, date, organization, hours
-         FROM events
-        ORDER BY date DESC, id DESC`
+    const result = await pool.query(
+      "SELECT * FROM events WHERE CreatorID = $1 ORDER BY id ASC",
+      [creatorId]
     );
-    return res.status(200).json({ events: all.rows.map(dbRowToEvent) });
-  } catch (e) {
-    console.error("DELETE /event/delete error:", e);
-    res.status(500).json({ message: "Server error" });
-  }
-});
 
-// GET /event/get/:name -> client’s expected shape
-router.get("/event/get/:name", async (req, res) => {
-  try {
-    const { name } = req.params;
-    const q = await pool.query(
-      `SELECT id, name, description, location, zipcode, requiredskills, urgency, date, organization, hours
-         FROM events
-        WHERE name = $1
-        LIMIT 1`,
-      [name]
-    );
-    if (!q.rowCount) return res.status(404).json({ message: "Event not found" });
+    if (result.rows.length === 0) {
+      return res.status(401).json({ message: "No events found for this user" });
+    }
 
-    const ev = dbRowToEvent(q.rows[0]);
-    return res.json({
+    const events = result.rows.map((ev) => ({
       eventName: ev.name,
       eventDescription: ev.description,
       eventLocation: ev.location,
-      eventZipCode: ev.zip,
-      eventRequiredSkills: ev.requiredSkills,
+      eventZipcode: ev.zipcode,
+      eventRequiredSkills: ev.requiredskills,
       eventUrgency: ev.urgency,
       eventDate: ev.date,
-    });
-  } catch (e) {
-    console.error("GET /event/get/:name error:", e);
-    res.status(500).json({ message: "Server error" });
+      organization: ev.organization,
+      hours: ev.hours,
+    }));
+
+    res.status(200).json({ events });
+  } catch (err) {
+    console.error("Error fetching user's events:", err.message);
+    res.status(500).json({ error: "Server error while fetching events" });
   }
 });
 
-// PUT /event/edit/:name  (body: client form shape)
-router.put("/event/edit/:name", async (req, res) => {
+router.get("/:name", async (req, res) => {
   try {
-    const currentName = req.params.name;
+    const { name } = req.params;
 
-    // Map client shape -> DB columns (only set provided fields)
-    const p = req.body || {};
-    const fields = [];
-    const vals = [];
-    let i = 1;
+    if (!name) {
+      return res.status(400).json({ error: "Event name is required" });
+    }
 
-    const set = (col, val) => { fields.push(`${col} = $${i++}`); vals.push(val); };
+    // Query PostgreSQL
+    const result = await pool.query("SELECT * FROM events WHERE name = $1", [
+      name,
+    ]);
 
-    if (p.eventName            != null) set("name",            p.eventName);
-    if (p.eventDescription     != null) set("description",     p.eventDescription);
-    if (p.eventLocation        != null) set("location",        p.eventLocation);
-    if (p.eventZipCode         != null) set("zipcode",         p.eventZipCode);
-    if (p.eventRequiredSkills  != null) set("requiredskills",  serializeSkills(p.eventRequiredSkills));
-    if (p.eventUrgency         != null) set("urgency",         p.eventUrgency);
-    if (p.eventDate            != null) set("date",            p.eventDate);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Event not found" });
+    }
 
-    if (!fields.length) return res.status(400).json({ message: "No fields to update" });
+    const ev = result.rows[0];
 
-    // WHERE name = currentName
-    vals.push(currentName);
-    const upd = await pool.query(
-      `UPDATE events SET ${fields.join(", ")} WHERE name = $${i} RETURNING
-         id, name, description, location, zipcode, requiredskills, urgency, date, organization, hours`,
-      vals
+    res.status(200).json({
+      eventName: ev.name,
+      eventDescription: ev.description,
+      eventLocation: ev.location,
+      eventZipcode: ev.zipcode,
+      eventRequiredSkills: ev.requiredskills,
+      eventUrgency: ev.urgency,
+      eventDate: ev.date,
+      organization: ev.organization,
+      hours: ev.hours,
+    });
+  } catch (err) {
+    console.error("Error fetching event:", err.message);
+    res.status(500).json({ error: "Server error while fetching event" });
+  }
+});
+
+// GET /event/id/:name -> returns the event ID and details by name
+router.get("/id/:name", async (req, res) => {
+  try {
+    const { name } = req.params;
+
+    // Query the event by name
+    const result = await pool.query(
+      "SELECT id, name, description, location, zipcode, requiredskills, urgency, date, organization, hours FROM events WHERE name = $1",
+      [name]
     );
 
-    if (!upd.rowCount) return res.status(404).json({ message: "Event not found" });
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: "Event not found" });
+    }
 
-    return res.json({ event: dbRowToEvent(upd.rows[0]) });
-  } catch (e) {
-    console.error("PUT /event/edit/:name error:", e);
-    res.status(500).json({ message: "Server error" });
+    // Return the event details (including id)
+    res.status(200).json({
+      message: "Event found",
+      event: result.rows[0],
+    });
+  } catch (err) {
+    console.error("Error fetching event ID:", err.message);
+    res.status(500).json({ error: "Server error while fetching event ID" });
+  }
+});
+
+// PUT /event/edit/:id
+router.put("/edit/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      eventName,
+      eventDescription,
+      eventLocation,
+      eventZipcode,
+      eventRequiredSkills,
+      eventUrgency,
+      eventDate,
+      organization,
+      hours,
+    } = req.body;
+
+    // Check if event exists
+    const existingEvent = await pool.query(
+      "SELECT * FROM events WHERE id = $1",
+      [id]
+    );
+    if (existingEvent.rows.length === 0) {
+      return res.status(404).json({ message: "Event not found" });
+    }
+
+    var eventUrgencyNumberForm = 0;
+
+    if (eventUrgency == "Critical") eventUrgencyNumberForm = 3;
+    else if (eventUrgency == "High") eventUrgencyNumberForm = 2;
+    else if (eventUrgency == "Medium") eventUrgencyNumberForm = 1;
+    else if (eventUrgency == "Low") eventUrgencyNumberForm = 0;
+
+    // Update event by ID
+    const updateQuery = `
+      UPDATE events
+      SET
+        name = COALESCE($1, name),
+        description = COALESCE($2, description),
+        location = COALESCE($3, location),
+        zipcode = COALESCE($4, zipcode),
+        requiredskills = COALESCE($5, requiredskills),
+        urgency = COALESCE($6, urgency),
+        date = COALESCE($7, date),
+        organization = COALESCE($8, organization),
+        hours = COALESCE($9, hours)
+      WHERE id = $10
+      RETURNING *;
+    `;
+
+    const values = [
+      eventName,
+      eventDescription,
+      eventLocation,
+      eventZipcode,
+      eventRequiredSkills,
+      eventUrgencyNumberForm,
+      eventDate,
+      organization,
+      hours,
+      id,
+    ];
+
+    const result = await pool.query(updateQuery, values);
+
+    res.status(200).json({
+      message: "Event updated successfully",
+      event: result.rows[0],
+    });
+  } catch (err) {
+    console.error("Error updating event:", err.message);
+    res.status(500).json({ error: "Server error while updating event" });
   }
 });
 
