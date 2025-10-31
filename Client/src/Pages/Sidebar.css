@@ -1,63 +1,129 @@
+/* ===== APP PADDING — prevents overlap ===== */
+body {
+  --sidebar-space: 232px;   /* 232px open, 72px collapsed (JS updates) */
+  --rail: 72px;             /* collapsed width */
+  --vh-blue: #3865e2;
+  --vh-blue-700: #1c3ec3;
+  --card-bg: #ffffff;
+  --card-border: #e5e7eb;
+  --shadow-strong: 0 8px 20px rgba(0,0,0,0.14);
+  padding-left: var(--sidebar-space);
+  transition: padding-left 200ms ease;
+}
+
+/* ===== SIDEBAR SHELL ===== */
 .sidebar {
   position: fixed;
-  top: 0;
-  left: 0;
-  height: 100vh;
-  width: 220px;
-  background-color: #3865e2;
-  padding: 20px 10px;
-  color: white;
+  inset: 0 auto 0 0;
+  width: 232px;
+  background: var(--vh-blue);
+  color: #fff;
   z-index: 1000;
-  overflow-y: auto;
-  transition: width 0.3s ease;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 3px 0 12px rgba(0,0,0,0.15);
+  overflow: visible;                /* allow hover card to render outside */
+  transition: width 160ms ease;
 }
 
-.sidebar.collapsed {
-  width: 70px;
-  padding: 20px 5px;
-  text-align: center;
-}
-
-.sidebar a {
-  color: white;
-  margin-bottom: 10px;
-  padding: 8px;
-  border-radius: 4px;
-  text-decoration: none;
+/* Header */
+.sidebar-header {
   display: flex;
   align-items: center;
-  justify-content: flex-start;
-  transition: all 0.2s;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 14px 14px 8px;
 }
-
-.sidebar.collapsed a {
-  justify-content: center;
-  font-size: 1.2rem;
-}
-
-.sidebar a:hover {
-  background-color: #ffffff;
-  color: #3865e2;
-}
+.brand { font-weight: 700; font-size: 1.08rem; }
 
 .collapse-btn {
-  background: transparent;
-  border: none;
-  color: white;
-  font-size: 1.4rem;
-  cursor: pointer;
-  margin-bottom: 20px;
-  display: block;
-  margin-left: auto;
-  margin-right: auto;
-  transition: transform 0.3s ease;
+  width: 34px; height: 34px;
+  border: 0; border-radius: 8px;
+  background: rgba(255,255,255,0.15);
+  color: #fff; font-weight: 700; cursor: pointer;
+  transition: background 120ms ease;
+}
+.collapse-btn:hover { background: rgba(255,255,255,0.25); }
+
+/* Nav list */
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 8px 12px;
+  overflow-y: auto;
+  overflow-x: visible;
+  scrollbar-width: none;
+}
+.sidebar-nav::-webkit-scrollbar { display: none; }
+
+/* Items: stable grid (icon | label | badge) */
+.nav-item {
+  display: grid;
+  grid-template-columns: 24px minmax(0,1fr) auto; /* constant */
+  align-items: center;
+  column-gap: 10px;
+  height: 44px;
+  padding: 0 10px;
+  border-radius: 10px;
+  color: #fff;
+  text-decoration: none;
+  transition: background 120ms ease, color 120ms ease;
+  position: relative;
+}
+.nav-item:hover { background: #fff; color: var(--vh-blue-700); }
+.nav-item.active { background: rgba(255,255,255,0.18); }
+.nav-item .counter { margin-left: auto; }
+
+.icon { width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; }
+.icon svg { width: 18px; height: 18px; display: block; }
+
+/* Label: width snaps, text fades (no stretch) */
+.label-wrap { overflow: hidden; white-space: nowrap; }
+.label { opacity: 1; transition: opacity 140ms ease; }
+.sidebar:not(.collapsed) .label { transition-delay: 120ms; }
+
+/* Collapsed state */
+.sidebar.collapsed { width: var(--rail); }
+.sidebar.collapsed .label-wrap { width: 0 !important; }
+.sidebar:not(.collapsed) .label-wrap { width: auto !important; }
+.sidebar.collapsed .label { opacity: 0; pointer-events: none; transition-delay: 0ms; }
+
+/* ============================
+   THEMED HOVER CARD (React-rendered)
+   Shown only when collapsed and hovering an item
+============================ */
+.hover-card {
+  position: fixed;                     /* relative to viewport for reliability */
+  left: calc(var(--rail) + 12px);
+  transform: translateY(-50%);
+  z-index: 3000;
+  pointer-events: none;                /* ignore mouse so hover doesn't flicker */
 }
 
-.collapse-btn:hover {
-  transform: scale(1.2);
+.hover-card-body {
+  background: var(--card-bg);
+  color: #111827;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--card-border);
+  box-shadow: var(--shadow-strong);
 }
 
-.sidebar-top {
-  margin-bottom: 20px;
-  text-align: center;
+.hover-card-arrow {
+  position: absolute;
+  left: -6px;
+  top: 50%;
+  transform: translateY(-50%) rotate(45deg);
+  width: 12px; height: 12px;
+  background: var(--card-bg);
+  border-left: 1px solid var(--card-border);
+  border-top: 1px solid var(--card-border);
+  box-shadow: var(--shadow-strong);
 }
+
+/* Links inherit color */
+.sidebar a { color: inherit; text-decoration: none; }
