@@ -16,9 +16,22 @@ const fmtDate = (iso) =>
       })
     : "";
 
+function hasValidToken() {
+  const t = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  if (!t) return false;
+  try {
+    const d = JSON.parse(atob(t.split(".")[1] || ""));
+    if (!d?.exp) return true;
+    return d.exp > Math.floor(Date.now() / 1000);
+  } catch {
+    return false;
+  }
+}
+
 export default function PublicHome() {
   const [loading, setLoading] = useState(true);
   const [events, setEvents] = useState([]);
+  const authed = hasValidToken(); // defensive; App.jsx should already gate this
 
   useEffect(() => {
     (async () => {
@@ -37,11 +50,10 @@ export default function PublicHome() {
 
   const upcoming = useMemo(() => {
     const today = new Date();
-    const items = (events || [])
+    return (events || [])
       .filter((e) => new Date(e.eventDate || e.date) >= new Date(today.toDateString()))
       .sort((a, b) => new Date(a.eventDate || a.date) - new Date(b.eventDate || b.date))
       .slice(0, 6);
-    return items;
   }, [events]);
 
   return (
@@ -56,14 +68,18 @@ export default function PublicHome() {
               Discover upcoming opportunities and make an impact in your community.
             </div>
           </div>
-          <div className="d-flex gap-2">
-            <Button as={Link} to="/login" variant="primary">
-              Log In
-            </Button>
-            <Button as={Link} to="/register" variant="outline-primary">
-              Create Account
-            </Button>
-          </div>
+
+          {/* ✅ Hide CTAs if already authenticated */}
+          {!authed && (
+            <div className="d-flex gap-2">
+              <Button as={Link} to="/login" variant="primary">
+                Log In
+              </Button>
+              <Button as={Link} to="/register" variant="outline-primary">
+                Create Account
+              </Button>
+            </div>
+          )}
         </div>
 
         {/* Upcoming Events (public) */}
