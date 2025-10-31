@@ -74,6 +74,14 @@ function decodeJwt(token) {
   }
 }
 
+function isTokenValid(token) {
+  if (!token) return false;
+  const decoded = decodeJwt(token);
+  if (!decoded?.exp) return true;
+  const now = Math.floor(Date.now() / 1000);
+  return decoded.exp > now;
+}
+
 export default function Sidebar() {
   const location = useLocation();
 
@@ -87,16 +95,14 @@ export default function Sidebar() {
   // Hover card state (label + top position)
   const [hoverCard, setHoverCard] = useState({ label: null, top: 0 });
 
+  const token =
+    typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  const authed = isTokenValid(token);
+
   useEffect(() => {
-    // ✅ use JWT instead of hard-coded "u1"
     const fetchUnread = async () => {
       try {
-        const token = localStorage.getItem("token");
-        if (!token) return setUnreadNotifs(0);
-
-        const decoded = decodeJwt(token);
-        if (!decoded?.id) return setUnreadNotifs(0);
-
+        if (!authed) return setUnreadNotifs(0);
         const { data } = await axios.get(
           "http://localhost:5000/notifications/getAllForThisUser",
           {
@@ -110,7 +116,12 @@ export default function Sidebar() {
       }
     };
     fetchUnread();
-  }, [location.pathname]);
+
+    const handleRefresh = () => fetchUnread();
+    window.addEventListener("notificationsUpdated", handleRefresh);
+    return () => window.removeEventListener("notificationsUpdated", handleRefresh);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname, authed, token]);
 
   useEffect(() => {
     document.body.style.setProperty("--sidebar-space", collapsed ? "72px" : "232px");
@@ -156,24 +167,37 @@ export default function Sidebar() {
       </div>
 
       <nav className="sidebar-nav">
-        {/* ✅ New Home tab (keeps everything else the same) */}
+        {/* Home visible to everyone */}
         <Item to="/" icon={<Icon.Home />} label="Home" />
 
-        <Item to="/eventmanagement" icon={<Icon.Calendar />} label="Event Management" />
-        <Item to="/profilemanagement" icon={<Icon.Users />} label="Profile Management" />
+        {/* Always-visible public browsing */}
         <Item to="/BrowseEvents" icon={<Icon.Search />} label="Browse Events" />
-        <Item to="/inbox" icon={<Icon.Mail />} label="Inbox">
-          {unreadNotifs > 0 && (
-            <Badge bg="danger" pill className="counter">{unreadNotifs}</Badge>
-          )}
-        </Item>
-        <Item to="/eventlist" icon={<Icon.CheckList />} label="Assignments" />
-        <Item to="/VolunteerMatching" icon={<Icon.Users />} label="Volunteer Matching" />
-        <Item to="/VolunteerHistory" icon={<Icon.History />} label="Volunteer History" />
-        <Item to="/settings" icon={<Icon.Gear />} label="Settings" />
-        <Item to="/register" icon={<Icon.Lock />} label="Register" />
-        <Item to="/login" icon={<Icon.Lock />} label="Login" />
-        <Item to="/logout" icon={<Icon.Door />} label="Log Out" />
+
+        {/* Auth-only items */}
+        {authed && (
+          <>
+            <Item to="/eventmanagement" icon={<Icon.Calendar />} label="Event Management" />
+            <Item to="/profilemanagement" icon={<Icon.Users />} label="Profile Management" />
+            <Item to="/inbox" icon={<Icon.Mail />} label="Inbox">
+              {unreadNotifs > 0 && (
+                <Badge bg="danger" pill className="counter">{unreadNotifs}</Badge>
+              )}
+            </Item>
+            <Item to="/eventlist" icon={<Icon.CheckList />} label="Assignments" />
+            <Item to="/VolunteerMatching" icon={<Icon.Users />} label="Volunteer Matching" />
+            <Item to="/VolunteerHistory" icon={<Icon.History />} label="Volunteer History" />
+            <Item to="/settings" icon={<Icon.Gear />} label="Settings" />
+          </>
+        )}
+
+        {/* Auth gates for auth links */}
+        {!authed && (
+          <>
+            <Item to="/register" icon={<Icon.Lock />} label="Register" />
+            <Item to="/login" icon={<Icon.Lock />} label="Login" />
+          </>
+        )}
+        {authed && <Item to="/logout" icon={<Icon.Door />} label="Log Out" />}
       </nav>
 
       {/* Themed hover card (shown only when collapsed and hovering) */}

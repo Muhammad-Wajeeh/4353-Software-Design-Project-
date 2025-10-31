@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import "./App.css";
 import Login from "./Pages/Login";
@@ -12,7 +12,33 @@ import EditEvent from "./Pages/EditEvent";
 import Inbox from "./Pages/Inbox";
 import EventDetails from "./Pages/EventDetails";
 import HistoryDetails from "./Pages/HistoryDetails";
-import Home from "./Pages/Home"; // ✅ fixed path
+import BrowseEvents from "./Pages/BrowseEvents";
+import Home from "./Pages/Home";
+import PublicHome from "./Pages/PublicHome";
+
+function decodeJwt(token) {
+  try {
+    const base64Url = token.split(".")[1];
+    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split("")
+        .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+        .join("")
+    );
+    return JSON.parse(jsonPayload);
+  } catch {
+    return null;
+  }
+}
+
+function isTokenValid(token) {
+  if (!token) return false;
+  const decoded = decodeJwt(token);
+  if (!decoded?.exp) return true; // be permissive if exp missing
+  const now = Math.floor(Date.now() / 1000);
+  return decoded.exp > now;
+}
 
 function App() {
   const [count, setCount] = useState(0);
@@ -32,13 +58,19 @@ function App() {
   const [eventDate, setEventDate] = useState("");
   const [eventsList, setEventsList] = useState([]);
 
+  const authed = useMemo(
+    () => isTokenValid(typeof window !== "undefined" ? localStorage.getItem("token") : null),
+    []
+  );
+
   return (
     <>
       <Router>
         <Routes>
-          {/* ✅ Root now loads the Home/Dashboard */}
-          <Route path="/" element={<Home />} />
+          {/* Root shows member dashboard if authed, otherwise public landing */}
+          <Route path="/" element={authed ? <Home /> : <PublicHome />} />
 
+          {/* Keep all existing routes */}
           <Route
             path="/Login"
             element={
@@ -96,24 +128,15 @@ function App() {
             }
           />
 
-          <Route
-            path="/VolunteerHistory"
-            element={<VolunteerHistory></VolunteerHistory>}
-          />
-          <Route
-            path="/VolunteerMatching"
-            element={<VolunteerMatching></VolunteerMatching>}
-          />
-
+          <Route path="/BrowseEvents" element={<BrowseEvents />} />
+          <Route path="/VolunteerHistory" element={<VolunteerHistory />} />
+          <Route path="/VolunteerMatching" element={<VolunteerMatching />} />
           <Route path="/events/edit/:eventName" element={<EditEvent />} />
-          <Route path="/inbox" element={<Inbox></Inbox>} />
-          <Route path="/events/:id" element={<EventDetails></EventDetails>} />
-          <Route
-            path="/history/event/:eventId"
-            element={<HistoryDetails></HistoryDetails>}
-          />
+          <Route path="/inbox" element={<Inbox />} />
+          <Route path="/events/:id" element={<EventDetails />} />
+          <Route path="/history/event/:eventId" element={<HistoryDetails />} />
 
-          {/* Fallback */}
+          {/* Fallback (keep your old behavior) */}
           <Route path="*" element={<Sidebar />} />
         </Routes>
       </Router>
