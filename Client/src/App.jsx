@@ -12,7 +12,7 @@ import EditEvent from "./Pages/EditEvent";
 import Inbox from "./Pages/Inbox";
 import EventDetails from "./Pages/EventDetails";
 import HistoryDetails from "./Pages/HistoryDetails";
-import BrowseEvents from "./Pages/BrowseEvents";
+import Home from "./Pages/Home"; // ✅ fixed path
 
 function App() {
   const [count, setCount] = useState(0);
@@ -36,7 +36,9 @@ function App() {
     <>
       <Router>
         <Routes>
-          <Route path="/" element={<Sidebar></Sidebar>} />
+          {/* ✅ Root now loads the Home/Dashboard */}
+          <Route path="/" element={<Home />} />
+
           <Route
             path="/Login"
             element={
@@ -111,7 +113,8 @@ function App() {
             element={<HistoryDetails></HistoryDetails>}
           />
 
-          <Route path="/BrowseEvents" element={<BrowseEvents></BrowseEvents>} />
+          {/* Fallback */}
+          <Route path="*" element={<Sidebar />} />
         </Routes>
       </Router>
     </>

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import axios from "axios";
 import Sidebar from "./Sidebar";
 import Badge from "react-bootstrap/Badge";
 import Button from "react-bootstrap/Button";
@@ -7,39 +8,48 @@ import Spinner from "react-bootstrap/Spinner";
 import ButtonGroup from "react-bootstrap/ButtonGroup";
 import Form from "react-bootstrap/Form";
 
-const API = "http://localhost:5000";
+function decodeJwt(token) {
+  try {
+    const base64Url = token.split(".")[1];
+    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split("")
+        .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+        .join("")
+    );
+    return JSON.parse(jsonPayload);
+  } catch {
+    return null;
+  }
+}
 
-function Inbox() {
+export default function Inbox() {
   const [items, setItems] = useState([]);
   const [onlyUnread, setOnlyUnread] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [booting, setBooting] = useState(true);
 
-  const authHeader = () => ({
-    Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
-    "Content-Type": "application/json",
-  });
+  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  const decoded = token ? decodeJwt(token) : null;
+  const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
 
-  // Fetch all notifications for logged-in user
   const fetchNotifs = async () => {
     setLoading(true);
     try {
-      const res = await fetch(
-        `${API}/notifications/getAllForThisUser?onlyUnread=${onlyUnread}`,
-        { headers: authHeader() }
-      );
-      if (!res.ok) {
-        console.error("Failed to fetch notifications:", res.status);
+      if (!decoded?.id) {
         setItems([]);
-      } else {
-        const data = await res.json();
-        setItems(Array.isArray(data.notifications) ? data.notifications : []);
+        return;
       }
-    } catch (err) {
-      console.error("Error fetching notifications:", err);
+      const { data } = await axios.get(
+        "http://localhost:5000/notifications/getAllForThisUser",
+        { headers: authHeaders, params: { onlyUnread } }
+      );
+      setItems(Array.isArray(data.notifications) ? data.notifications : []);
+    } catch (e) {
+      console.error(e);
+      setItems([]);
     } finally {
       setLoading(false);
-      setBooting(false);
     }
   };
 
@@ -48,73 +58,70 @@ function Inbox() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onlyUnread]);
 
-  // Mark one notification as read
-  const markRead = async (notificationId) => {
+  const markRead = async (idLike) => {
     try {
-      const res = await fetch(
-        `${API}/notifications/${notificationId}/markAsRead`,
-        { method: "PUT" }
+      const id = idLike?.id ?? idLike?.notificationid ?? idLike;
+      if (!id) return;
+      await axios.patch(`http://localhost:5000/notifications/${id}/read`, null, {
+        headers: authHeaders,
+      });
+      setItems((prev) =>
+        prev.map((n) => {
+          const nid = n.id ?? n.notificationid;
+          return nid === id ? { ...n, wasread: true, read: true } : n;
+        })
       );
-      if (res.ok) {
-        setItems((prev) =>
-          prev.map((n) =>
-            n.notificationId === notificationId ? { ...n, wasRead: true } : n
-          )
-        );
-      } else {
-        console.error("markRead failed:", await res.text());
-      }
-    } catch (err) {
-      console.error("markRead error:", err);
+      window.dispatchEvent(new Event("notificationsUpdated"));
+    } catch (e) {
+      console.error(e);
     }
   };
 
-  // Mark all as read (for current user)
   const markAllRead = async () => {
     try {
-      const res = await fetch(`${API}/notifications/markAllAsReadForThisUser`, {
-        method: "PUT",
-        headers: authHeader(),
-      });
-      if (res.ok) {
-        setItems((prev) => prev.map((n) => ({ ...n, wasRead: true })));
-      } else {
-        console.error("markAllRead failed:", await res.text());
-      }
-    } catch (err) {
-      console.error("markAllRead error:", err);
+      await axios.patch(
+        "http://localhost:5000/notifications/markAllAsReadForThisUser",
+        null,
+        { headers: authHeaders }
+      );
+      setItems((prev) => prev.map((n) => ({ ...n, wasread: true, read: true })));
+      window.dispatchEvent(new Event("notificationsUpdated"));
+    } catch (e) {
+      console.error(e);
     }
   };
 
-  // Delete one notification
-  const remove = async (notificationId) => {
+  const remove = async (idLike) => {
     try {
-      const res = await fetch(`${API}/notifications/delete/${notificationId}`, {
-        method: "DELETE",
+      const id = idLike?.id ?? idLike?.notificationid ?? idLike;
+      if (!id) return;
+      await axios.delete(`http://localhost:5000/notifications/${id}`, {
+        headers: authHeaders,
       });
-      if (res.ok) {
-        setItems((prev) =>
-          prev.filter((n) => n.notificationId !== notificationId)
-        );
-      } else {
-        console.error("remove failed:", await res.text());
-      }
-    } catch (err) {
-      console.error("remove error:", err);
+      setItems((prev) => prev.filter((n) => (n.id ?? n.notificationid) !== id));
+      window.dispatchEvent(new Event("notificationsUpdated"));
+    } catch (e) {
+      console.error(e);
     }
   };
 
-  // UI helpers (match backend field names)
-  const typeBadge = (n) => {
-    if (n.isAssignment) return <Badge bg="primary">assignment</Badge>;
-    if (n.isReminder) return <Badge bg="warning">reminder</Badge>;
-    return <Badge bg="secondary">general</Badge>;
+  const typeColor = (n) => {
+    const isAssign = n.isassignment ?? n.isAssignment;
+    const isRem = n.isreminder ?? n.isReminder;
+    if (isAssign) return "primary";
+    if (isRem) return "warning";
+    return "secondary";
   };
 
-  const fmtWhen = (v) => {
-    if (!v && v !== 0) return "";
-    const ms = typeof v === "string" ? Number(v) : v;
-    return Number.isFinite(ms) ? new Date(ms).toLocaleString() : "";
+  const isRead = (n) => (n.wasread ?? n.read) === true;
+
+  const createdAtStr = (n) => {
+    const unix = n.datereceived ?? n.dateReceived;
+    if (unix == null) return "";
+    const ms = Number(unix) * 1000;
+    if (!Number.isFinite(ms)) return "";
+    return new Date(ms).toLocaleString();
+    // If you later migrate to timestamptz, just new Date(n.datereceived).toLocaleString()
   };
 
   return (
@@ -140,11 +147,7 @@ function Inbox() {
           </div>
         </div>
 
-        {booting ? (
-          <div className="text-center py-5">
-            <Spinner animation="border" />
-          </div>
-        ) : loading ? (
+        {loading ? (
           <div className="text-center py-5">
             <Spinner animation="border" />
           </div>
@@ -152,46 +155,48 @@ function Inbox() {
           <p className="text-center text-muted">No notifications.</p>
         ) : (
           <ListGroup>
-            {items.map((n) => (
-              <ListGroup.Item
-                key={n.notificationId}
-                className="d-flex justify-content-between align-items-start"
-              >
-                <div>
-                  <div className="d-flex align-items-center gap-2">
-                    {typeBadge(n)}
-                    {!n.wasRead && <Badge bg="danger">new</Badge>}
-                    <strong>{n.title}</strong>
+            {items.map((n) => {
+              const nid = n.id ?? n.notificationid;
+              return (
+                <ListGroup.Item
+                  key={nid}
+                  className="d-flex justify-content-between align-items-start"
+                >
+                  <div>
+                    <div className="d-flex align-items-center gap-2">
+                      <Badge bg={typeColor(n)}>
+                        {(n.isassignment ?? n.isAssignment)
+                          ? "assignment"
+                          : (n.isreminder ?? n.isReminder)
+                          ? "reminder"
+                          : "update"}
+                      </Badge>
+                      {!isRead(n) && <Badge bg="danger">new</Badge>}
+                      <strong>{n.title}</strong>
+                    </div>
+                    <div className="text-muted small">{createdAtStr(n)}</div>
+                    <div className="mt-1">{n.description}</div>
                   </div>
-                  <div className="text-muted small">
-                    {fmtWhen(n.dateReceived)}
-                  </div>
-                  <div className="mt-1">{n.description}</div>
-                </div>
 
-                <ButtonGroup size="sm">
-                  {!n.wasRead && (
-                    <Button
-                      variant="outline-success"
-                      onClick={() => markRead(n.notificationId)}
-                    >
-                      Mark read
+                  <ButtonGroup size="sm">
+                    {!isRead(n) && (
+                      <Button
+                        variant="outline-success"
+                        onClick={() => markRead(n)}
+                      >
+                        Mark read
+                      </Button>
+                    )}
+                    <Button variant="outline-danger" onClick={() => remove(n)}>
+                      Delete
                     </Button>
-                  )}
-                  <Button
-                    variant="outline-danger"
-                    onClick={() => remove(n.notificationId)}
-                  >
-                    Delete
-                  </Button>
-                </ButtonGroup>
-              </ListGroup.Item>
-            ))}
+                  </ButtonGroup>
+                </ListGroup.Item>
+              );
+            })}
           </ListGroup>
         )}
       </div>
     </>
   );
 }
-
-export default Inbox;

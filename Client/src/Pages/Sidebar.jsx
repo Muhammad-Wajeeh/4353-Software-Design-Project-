@@ -6,6 +6,11 @@ import "./Sidebar.css";
 
 /* Inline SVG icons */
 const Icon = {
+  Home: (p) => (
+    <svg viewBox="0 0 24 24" aria-hidden="true" {...p}>
+      <path fill="currentColor" d="M12 3L2 12h3v8h6v-5h2v5h6v-8h3L12 3Z" />
+    </svg>
+  ),
   Calendar: (p) => (
     <svg viewBox="0 0 24 24" aria-hidden="true" {...p}>
       <path fill="currentColor" d="M7 2h2v2h6V2h2v2h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h3V2Zm13 8H4v10h16V10Z"/>
@@ -53,6 +58,22 @@ const Icon = {
   ),
 };
 
+function decodeJwt(token) {
+  try {
+    const base64Url = token.split(".")[1];
+    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split("")
+        .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+        .join("")
+    );
+    return JSON.parse(jsonPayload);
+  } catch {
+    return null;
+  }
+}
+
 export default function Sidebar() {
   const location = useLocation();
 
@@ -67,12 +88,21 @@ export default function Sidebar() {
   const [hoverCard, setHoverCard] = useState({ label: null, top: 0 });
 
   useEffect(() => {
-    const userId = "u1"; // TODO: wire to auth
+    // ✅ use JWT instead of hard-coded "u1"
     const fetchUnread = async () => {
       try {
+        const token = localStorage.getItem("token");
+        if (!token) return setUnreadNotifs(0);
+
+        const decoded = decodeJwt(token);
+        if (!decoded?.id) return setUnreadNotifs(0);
+
         const { data } = await axios.get(
-          `http://localhost:5000/notifications/${userId}`,
-          { params: { onlyUnread: true } }
+          "http://localhost:5000/notifications/getAllForThisUser",
+          {
+            headers: { Authorization: `Bearer ${token}` },
+            params: { onlyUnread: true },
+          }
         );
         setUnreadNotifs((data.notifications || []).length);
       } catch {
@@ -126,6 +156,9 @@ export default function Sidebar() {
       </div>
 
       <nav className="sidebar-nav">
+        {/* ✅ New Home tab (keeps everything else the same) */}
+        <Item to="/" icon={<Icon.Home />} label="Home" />
+
         <Item to="/eventmanagement" icon={<Icon.Calendar />} label="Event Management" />
         <Item to="/profilemanagement" icon={<Icon.Users />} label="Profile Management" />
         <Item to="/BrowseEvents" icon={<Icon.Search />} label="Browse Events" />
