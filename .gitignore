@@ -1,0 +1,19 @@
+# dependencies
+node_modules/
+Server/node_modules/
+Client/node_modules/
+
+# build & coverage
+dist/
+build/
+coverage/
+Server/coverage/
+Client/dist/
+
+# env & logs
+.env
+.env.*
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
