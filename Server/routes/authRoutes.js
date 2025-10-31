@@ -38,27 +38,26 @@ router.post("/register", async (req, res) => {
 
 // POST /auth/login
 router.post("/login", async (req, res) => {
-  console.log("login route hit");
   const { username, password } = req.body;
   try {
     const queryResult = await pool.query(
-      "SELECT password FROM userprofiles WHERE username = $1",
+      "SELECT password, id FROM userprofiles WHERE username = $1",
       [username]
     );
-
-    console.log("Query result:", queryResult.rows);
 
     if (queryResult.rows.length === 0) {
       return res.status(404).json({ error: "User not found" });
     }
 
+    const id = queryResult.rows[0].id;
     const storedHashedPassword = queryResult.rows[0].password;
     const isPasswordValid = await bcrypt.compare(
       password,
       storedHashedPassword
     );
+
     if (isPasswordValid == true) {
-      const token = jwt.sign({ username: username }, JWT_SECRET, {
+      const token = jwt.sign({ username: username, id: id }, JWT_SECRET, {
         expiresIn: "1h",
       });
 
@@ -84,19 +83,4 @@ async function doesUserExist(username, email) {
   if (existingUser.rows.length > 0) return true;
 }
 
-// Middleware exports (if you use them)
-function authenticateToken(req, res, next) {
-  const authHeader = req.headers["authorization"];
-  const token = authHeader && authHeader.split(" ")[1];
-  if (!token) return res.sendStatus(401);
-
-  jwt.verify(token, JWT_SECRET, (err, user) => {
-    if (err) return res.sendStatus(403); // Forbidden
-    console.log("Decoded JWT payload:", user); // <- add this
-    req.user = user; // Attach user info to request
-    next();
-  });
-}
-
 module.exports = router;
-module.exports.authenticateToken = authenticateToken;

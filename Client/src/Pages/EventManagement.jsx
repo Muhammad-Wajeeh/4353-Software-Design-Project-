@@ -58,7 +58,10 @@ function EventManagement(props) {
 
       const response = await fetch("http://localhost:5000/event/create", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
         body: JSON.stringify(body),
       });
 
@@ -85,10 +88,16 @@ function EventManagement(props) {
 
   const getEvents = async () => {
     try {
-      const response = await fetch("http://localhost:5000/event/getall", {
-        method: "GET",
-        headers: { "Content-Type": "application/json" },
-      });
+      const response = await fetch(
+        "http://localhost:5000/event/getAllForThisUser",
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        }
+      );
 
       if (!response.ok) throw new Error("Failed to fetch events");
 

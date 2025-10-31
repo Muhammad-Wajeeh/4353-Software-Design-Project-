@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../DB");
+const authenticateToken = require("./authenticator");
 
 router.get("/", (req, res) => {
   res.status(200).json({ events });
@@ -33,7 +34,7 @@ router.get("/getall", async (req, res) => {
   }
 });
 
-router.post("/create", async (req, res) => {
+router.post("/create", authenticateToken, async (req, res) => {
   try {
     const {
       eventName,
@@ -60,8 +61,8 @@ router.post("/create", async (req, res) => {
     else if (eventUrgency == "Low") eventUrgencyNumberForm = 0;
 
     const queryResult = await pool.query(
-      `INSERT INTO events (name, description, location, zipcode, requiredskills, urgency, date)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      `INSERT INTO events (name, description, location, zipcode, requiredskills, urgency, date, creatorid )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
       [
         eventName,
         eventDescription,
@@ -70,6 +71,7 @@ router.post("/create", async (req, res) => {
         eventRequiredSkills,
         eventUrgencyNumberForm,
         eventDate,
+        req.user.id, // comes
       ]
     );
   } catch (err) {
@@ -112,6 +114,39 @@ router.delete("/delete", async (req, res) => {
   } catch (err) {
     console.error("Error deleting event:", err);
     res.status(500).json({ error: "Server error while deleting event" });
+  }
+});
+
+// GET /event/getAllForThisUser
+router.get("/getAllForThisUser", authenticateToken, async (req, res) => {
+  try {
+    const creatorId = req.user.id; // comes from the JWT payload
+
+    const result = await pool.query(
+      "SELECT * FROM events WHERE CreatorID = $1 ORDER BY id ASC",
+      [creatorId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(401).json({ message: "No events found for this user" });
+    }
+
+    const events = result.rows.map((ev) => ({
+      eventName: ev.name,
+      eventDescription: ev.description,
+      eventLocation: ev.location,
+      eventZipcode: ev.zipcode,
+      eventRequiredSkills: ev.requiredskills,
+      eventUrgency: ev.urgency,
+      eventDate: ev.date,
+      organization: ev.organization,
+      hours: ev.hours,
+    }));
+
+    res.status(200).json({ events });
+  } catch (err) {
+    console.error("Error fetching user's events:", err.message);
+    res.status(500).json({ error: "Server error while fetching events" });
   }
 });
 
