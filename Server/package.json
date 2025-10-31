@@ -13,6 +13,7 @@
   "license": "ISC",
   "dependencies": {
     "bcrypt": "^6.0.0",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
@@ -26,16 +27,18 @@
     "supertest": "^7.1.4"
   },
   "jest": {
-  "testEnvironment": "node",
-  "testMatch": ["**/tests/**/*.test.js", "**/__tests__/**/*.test.js"]
+    "testEnvironment": "node",
+    "testMatch": [
+      "**/tests/**/*.test.js",
+      "**/__tests__/**/*.test.js"
+    ]
   },
   "coverageThreshold": {
-  "global": {
-    "branches": 80,
-    "functions": 80,
-    "lines": 80,
-    "statements": 80
+    "global": {
+      "branches": 80,
+      "functions": 80,
+      "lines": 80,
+      "statements": 80
+    }
   }
-}
-
 }

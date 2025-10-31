@@ -1,21 +1,19 @@
-const Pool = require("pg").Pool;
+// Server/DB.js
+const { Pool } = require("pg");
 require("dotenv").config();
 
+// Create connection pool to Railway
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: {
-    rejectUnauthorized: false,
+    rejectUnauthorized: false, // required for Railway public access
   },
 });
 
-module.exports = pool;
+// Optional helper to simplify queries
+const query = (text, params) => pool.query(text, params);
 
-// const pool = new Pool({
-//   user: "postgres",
-//   password: "cgiang743",
-//   host: "localhost",
-//   port: "5432",
-//   database: "volunteerhub",
-// });
-
-// module.exports = pool;
+module.exports = {
+  pool,
+  query,
+};
