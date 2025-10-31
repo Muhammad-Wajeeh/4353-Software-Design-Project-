@@ -1,4 +1,4 @@
-const app = require("./app"); 
+const app = require("./app");
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
@@ -29,5 +29,4 @@ app.use("/auth", authRoutes);
 app.use("/profile", profileRoutes);
 app.use("/history", volunteerHistoryRoutes);
 app.use("/notifications", notificationRoutes);
-app.use("/events", eventRoutes);
-app.use("/event", eventRoutes); // legacy compatibility (your UI calls these)
+app.use("/event", eventRoutes);

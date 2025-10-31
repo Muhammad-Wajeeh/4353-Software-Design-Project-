@@ -7,13 +7,14 @@ function EditEvent() {
   const { eventName } = useParams();
   const navigate = useNavigate();
 
+  const [eventID, setEventID] = useState();
   const [event, setEvent] = useState(null);
 
   const onSubmitForm = async (e) => {
     e.preventDefault();
     try {
       const response = await fetch(
-        `http://localhost:5000/event/edit/${encodeURIComponent(eventName)}`,
+        `http://localhost:5000/event/edit/${encodeURIComponent(eventID)}`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -34,8 +35,18 @@ function EditEvent() {
 
   const fetchEvent = async () => {
     try {
+      const idResponse = await fetch(
+        `http://localhost:5000/event/id/${encodeURIComponent(eventName)}`,
+        { method: "GET", headers: { "Content-Type": "application/json" } }
+      );
+
+      if (!idResponse.ok) throw new Error("Failed to get event ID");
+      const idData = await idResponse.json();
+
+      setEventID(idData.event.id);
+
       const response = await fetch(
-        `http://localhost:5000/event/get/${encodeURIComponent(eventName)}`,
+        `http://localhost:5000/event/${encodeURIComponent(eventName)}`,
         { method: "GET", headers: { "Content-Type": "application/json" } }
       );
       if (!response.ok) throw new Error("Fetch failed");

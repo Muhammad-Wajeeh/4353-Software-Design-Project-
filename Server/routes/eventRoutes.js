@@ -1,115 +1,254 @@
 const express = require("express");
 const router = express.Router();
-const { events } = require("../data/mockData");
+const pool = require("../DB");
 
-// --------------------
-// Existing endpoints
-// --------------------
-
-// GET /events -> { events: [...] }
 router.get("/", (req, res) => {
   res.status(200).json({ events });
 });
 
-// GET /events/:id -> { event }
-router.get("/:id", (req, res) => {
-  const event = events.find((e) => e.id === req.params.id);
-  if (!event) return res.status(404).json({ message: "Event not found" });
-  res.status(200).json({ event });
+router.get("/getall", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT * FROM events ORDER BY id ASC");
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: "No events found" });
+    }
+
+    const events = result.rows.map((ev) => ({
+      eventName: ev.name,
+      eventDescription: ev.description,
+      eventLocation: ev.location,
+      eventZipcode: ev.zipcode,
+      eventRequiredSkills: ev.requiredskills,
+      eventUrgency: ev.urgency,
+      eventDate: ev.date,
+      organization: ev.organization,
+      hours: ev.hours,
+    }));
+
+    res.status(200).json({ events });
+  } catch (err) {
+    console.error("Error fetching all events:", err.message);
+    res.status(500).json({ error: "Server error while fetching events" });
+  }
 });
 
-// ----------------------------------------------------
-// Aliases to support current frontend client endpoints
-// ----------------------------------------------------
+router.post("/create", async (req, res) => {
+  try {
+    const {
+      eventName,
+      eventDescription,
+      eventLocation,
+      eventZipCode,
+      eventRequiredSkills,
+      eventUrgency,
+      eventDate,
+    } = req.body || {};
 
-// GET /event/getall  -> { events }
-router.get("/event/getall", (req, res) => {
-  res.status(200).json({ events });
-});
+    // Basic validation
+    if (!eventName || !eventDate) {
+      return res
+        .status(400)
+        .json({ message: "eventName and eventDate are required" });
+    }
 
-// POST /event/create  (body: client form shape)
-router.post("/event/create", (req, res) => {
-  const {
-    eventName,
-    eventDescription,
-    eventLocation,
-    eventZipCode,
-    eventRequiredSkills = [],
-    eventUrgency,
-    eventDate,
-  } = req.body || {};
+    var eventUrgencyNumberForm = 0;
 
-  // Basic validation
-  if (!eventName || !eventDate) {
-    return res.status(400).json({ message: "eventName and eventDate are required" });
+    if (eventUrgency == "Critical") eventUrgencyNumberForm = 3;
+    else if (eventUrgency == "High") eventUrgencyNumberForm = 2;
+    else if (eventUrgency == "Medium") eventUrgencyNumberForm = 1;
+    else if (eventUrgency == "Low") eventUrgencyNumberForm = 0;
+
+    const queryResult = await pool.query(
+      `INSERT INTO events (name, description, location, zipcode, requiredskills, urgency, date)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [
+        eventName,
+        eventDescription,
+        eventLocation,
+        eventZipCode,
+        eventRequiredSkills,
+        eventUrgencyNumberForm,
+        eventDate,
+      ]
+    );
+  } catch (err) {
+    postgresqlUniqueViolationErrorCode = "23505";
+    if (err.code == postgresqlUniqueViolationErrorCode)
+      res.status(400).json({ error: "Event name already exists" });
+
+    res.status(500);
+    console.log(err);
   }
 
-  const newEvent = {
-    id: "e" + Math.random().toString(36).slice(2, 8),
-    name: eventName,
-    description: eventDescription || "",
-    location: eventLocation || "",
-    zip: eventZipCode || "",
-    requiredSkills: Array.isArray(eventRequiredSkills) ? eventRequiredSkills : [],
-    urgency: eventUrgency || "Low",
-    date: eventDate,
-    status: "Open",
-    capacity: 0,
-    organization: "VolunteerHub",
-  };
-
-  events.push(newEvent);
-  return res.status(201).json({ event: newEvent, events });
+  return res.status(201).json("Event Created");
 });
 
-// DELETE /event/delete  (body: { eventName })
-router.delete("/event/delete", (req, res) => {
-  const { eventName } = req.body || {};
-  if (!eventName) return res.status(400).json({ message: "eventName required" });
+router.delete("/delete", async (req, res) => {
+  try {
+    const { eventName } = req.body;
 
-  const idx = events.findIndex((e) => e.name === eventName);
-  if (idx === -1) return res.status(404).json({ message: "Event not found" });
+    // Validation
+    if (!eventName) {
+      return res.status(400).json({ error: "eventName is required" });
+    }
 
-  events.splice(idx, 1);
-  return res.status(200).json({ events });
+    // Check if event exists
+    const existingEvent = await pool.query(
+      "SELECT * FROM events WHERE name = $1",
+      [eventName]
+    );
+
+    if (existingEvent.rows.length === 0) {
+      return res.status(404).json({ error: "Event not found" });
+    }
+
+    // Delete the event
+    await pool.query("DELETE FROM events WHERE name = $1", [eventName]);
+
+    return res.status(200).json({
+      message: `Event '${eventName}' deleted successfully`,
+    });
+  } catch (err) {
+    console.error("Error deleting event:", err);
+    res.status(500).json({ error: "Server error while deleting event" });
+  }
 });
 
-// GET /event/get/:name -> returns in the client’s expected shape
-router.get("/event/get/:name", (req, res) => {
-  const ev = events.find((e) => e.name === req.params.name);
-  if (!ev) return res.status(404).json({ message: "Event not found" });
+router.get("/:name", async (req, res) => {
+  try {
+    const { name } = req.params;
 
-  return res.json({
-    eventName: ev.name,
-    eventDescription: ev.description,
-    eventLocation: ev.location,
-    eventZipCode: ev.zip,
-    eventRequiredSkills: ev.requiredSkills,
-    eventUrgency: ev.urgency,
-    eventDate: ev.date,
-  });
+    if (!name) {
+      return res.status(400).json({ error: "Event name is required" });
+    }
+
+    // Query PostgreSQL
+    const result = await pool.query("SELECT * FROM events WHERE name = $1", [
+      name,
+    ]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Event not found" });
+    }
+
+    const ev = result.rows[0];
+
+    res.status(200).json({
+      eventName: ev.name,
+      eventDescription: ev.description,
+      eventLocation: ev.location,
+      eventZipcode: ev.zipcode,
+      eventRequiredSkills: ev.requiredskills,
+      eventUrgency: ev.urgency,
+      eventDate: ev.date,
+      organization: ev.organization,
+      hours: ev.hours,
+    });
+  } catch (err) {
+    console.error("Error fetching event:", err.message);
+    res.status(500).json({ error: "Server error while fetching event" });
+  }
 });
 
-// PUT /event/edit/:name  (body: client form shape)
-router.put("/event/edit/:name", (req, res) => {
-  const idx = events.findIndex((e) => e.name === req.params.name);
-  if (idx === -1) return res.status(404).json({ message: "Event not found" });
+// GET /event/id/:name -> returns the event ID and details by name
+router.get("/id/:name", async (req, res) => {
+  try {
+    const { name } = req.params;
 
-  const p = req.body || {};
-  events[idx] = {
-    ...events[idx],
-    name: p.eventName ?? events[idx].name,
-    description: p.eventDescription ?? events[idx].description,
-    location: p.eventLocation ?? events[idx].location,
-    zip: p.eventZipCode ?? events[idx].zip,
-    requiredSkills: Array.isArray(p.eventRequiredSkills)
-      ? p.eventRequiredSkills
-      : events[idx].requiredSkills,
-    urgency: p.eventUrgency ?? events[idx].urgency,
-    date: p.eventDate ?? events[idx].date,
-  };
+    // Query the event by name
+    const result = await pool.query(
+      "SELECT id, name, description, location, zipcode, requiredskills, urgency, date, organization, hours FROM events WHERE name = $1",
+      [name]
+    );
 
-  return res.json({ event: events[idx] });
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: "Event not found" });
+    }
+
+    // Return the event details (including id)
+    res.status(200).json({
+      message: "Event found",
+      event: result.rows[0],
+    });
+  } catch (err) {
+    console.error("Error fetching event ID:", err.message);
+    res.status(500).json({ error: "Server error while fetching event ID" });
+  }
+});
+
+// PUT /event/edit/:id
+router.put("/edit/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      eventName,
+      eventDescription,
+      eventLocation,
+      eventZipcode,
+      eventRequiredSkills,
+      eventUrgency,
+      eventDate,
+      organization,
+      hours,
+    } = req.body;
+
+    // Check if event exists
+    const existingEvent = await pool.query(
+      "SELECT * FROM events WHERE id = $1",
+      [id]
+    );
+    if (existingEvent.rows.length === 0) {
+      return res.status(404).json({ message: "Event not found" });
+    }
+
+    var eventUrgencyNumberForm = 0;
+
+    if (eventUrgency == "Critical") eventUrgencyNumberForm = 3;
+    else if (eventUrgency == "High") eventUrgencyNumberForm = 2;
+    else if (eventUrgency == "Medium") eventUrgencyNumberForm = 1;
+    else if (eventUrgency == "Low") eventUrgencyNumberForm = 0;
+
+    // Update event by ID
+    const updateQuery = `
+      UPDATE events
+      SET
+        name = COALESCE($1, name),
+        description = COALESCE($2, description),
+        location = COALESCE($3, location),
+        zipcode = COALESCE($4, zipcode),
+        requiredskills = COALESCE($5, requiredskills),
+        urgency = COALESCE($6, urgency),
+        date = COALESCE($7, date),
+        organization = COALESCE($8, organization),
+        hours = COALESCE($9, hours)
+      WHERE id = $10
+      RETURNING *;
+    `;
+
+    const values = [
+      eventName,
+      eventDescription,
+      eventLocation,
+      eventZipcode,
+      eventRequiredSkills,
+      eventUrgencyNumberForm,
+      eventDate,
+      organization,
+      hours,
+      id,
+    ];
+
+    const result = await pool.query(updateQuery, values);
+
+    res.status(200).json({
+      message: "Event updated successfully",
+      event: result.rows[0],
+    });
+  } catch (err) {
+    console.error("Error updating event:", err.message);
+    res.status(500).json({ error: "Server error while updating event" });
+  }
 });
 
 module.exports = router;

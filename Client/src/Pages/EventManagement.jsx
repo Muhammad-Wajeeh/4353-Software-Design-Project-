@@ -18,7 +18,8 @@ function EventManagement(props) {
   const setEventName = props.setEventName ?? setLocalEventName;
 
   const eventDescription = props.eventDescription ?? localEventDescription;
-  const setEventDescription = props.setEventDescription ?? setLocalEventDescription;
+  const setEventDescription =
+    props.setEventDescription ?? setLocalEventDescription;
 
   const eventLocation = props.eventLocation ?? localEventLocation;
   const setEventLocation = props.setEventLocation ?? setLocalEventLocation;
@@ -88,13 +89,18 @@ function EventManagement(props) {
         method: "GET",
         headers: { "Content-Type": "application/json" },
       });
+
       if (!response.ok) throw new Error("Failed to fetch events");
+
       const json = await response.json();
-      // server returns { events: [...] }
-      setEventsList(Array.isArray(json.events) ? json.events : []);
+
+      // Server returns { events: [...] } → extract safely
+      const eventsArray = Array.isArray(json.events) ? json.events : [];
+
+      setEventsList(eventsArray);
     } catch (error) {
-      console.error(error);
-      setEventsList([]); // never let it be non-array
+      console.error("Error fetching events:", error);
+      setEventsList([]); // ensures it never breaks render
     }
   };
 
