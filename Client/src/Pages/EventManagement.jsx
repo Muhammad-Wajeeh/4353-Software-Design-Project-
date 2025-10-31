@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Form, Button, Card } from "react-bootstrap";
 import Sidebar from "./Sidebar";
+import "./EventManagement.css";
 
 function EventManagement(props) {
   // Support both “lifted state via props” AND local state (fallbacks)

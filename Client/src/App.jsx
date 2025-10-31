@@ -12,6 +12,7 @@ import EditEvent from "./Pages/EditEvent";
 import Inbox from "./Pages/Inbox";
 import EventDetails from "./Pages/EventDetails";
 import HistoryDetails from "./Pages/HistoryDetails";
+import BrowseEvents from "./Pages/BrowseEvents";
 
 function App() {
   const [count, setCount] = useState(0);
@@ -109,6 +110,8 @@ function App() {
             path="/history/event/:eventId"
             element={<HistoryDetails></HistoryDetails>}
           />
+
+          <Route path="/BrowseEvents" element={<BrowseEvents></BrowseEvents>} />
         </Routes>
       </Router>
     </>

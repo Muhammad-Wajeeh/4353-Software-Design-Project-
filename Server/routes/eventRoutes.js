@@ -61,8 +61,8 @@ router.post("/create", authenticateToken, async (req, res) => {
     else if (eventUrgency == "Low") eventUrgencyNumberForm = 0;
 
     const queryResult = await pool.query(
-      `INSERT INTO events (name, description, location, zipcode, requiredskills, urgency, date, creatorid )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      `INSERT INTO events (name, description, location, zipcode, requiredskills, urgency, date, creatorid, organization )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
       [
         eventName,
         eventDescription,
@@ -72,6 +72,7 @@ router.post("/create", authenticateToken, async (req, res) => {
         eventUrgencyNumberForm,
         eventDate,
         req.user.id, // comes
+        req.user.username
       ]
     );
   } catch (err) {

@@ -56,13 +56,8 @@ function Sidebar() {
           Profile Management
         </Nav.Link>
 
-        <Nav.Link as={Link} to="/eventlist">
-          Event List{" "}
-          {newEvents > 0 && (
-            <Badge bg="danger" pill className="ms-2">
-              {newEvents}
-            </Badge>
-          )}
+        <Nav.Link as={Link} to="/BrowseEvents">
+          BrowseEvents
         </Nav.Link>
 
         <Nav.Link as={Link} to="/inbox">
