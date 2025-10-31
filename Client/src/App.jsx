@@ -15,6 +15,8 @@ import HistoryDetails from "./Pages/HistoryDetails";
 import BrowseEvents from "./Pages/BrowseEvents";
 import Home from "./Pages/Home";
 import PublicHome from "./Pages/PublicHome";
+import Logout from "./Pages/Logout";
+
 
 function decodeJwt(token) {
   try {
@@ -98,6 +100,13 @@ function App() {
                 setPassword={setPassword}
               />
             }
+          />
+          <Route 
+            path="/logout" 
+            element={
+              <Logout 
+              />
+            } 
           />
           <Route
             path="/ProfileManagement"
