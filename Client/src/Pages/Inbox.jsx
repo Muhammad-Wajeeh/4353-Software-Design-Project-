@@ -8,68 +8,101 @@ import Spinner from "react-bootstrap/Spinner";
 import ButtonGroup from "react-bootstrap/ButtonGroup";
 import Form from "react-bootstrap/Form";
 
-function Inbox() {                       // <-- rename component to match file
-  const userId = "u1"; // mock user
+const API = import.meta?.env?.VITE_API_BASE || "http://localhost:5000";
+
+/**
+ * Axios instance that always attaches the JWT from localStorage
+ * (server can't read localStorage; client must send the token)
+ */
+const http = axios.create({ baseURL: API });
+http.interceptors.request.use((config) => {
+  const token = localStorage.getItem("token");
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  else delete config.headers.Authorization;
+  return config;
+});
+
+function Inbox() {
+  const [user, setUser] = useState(null); // { id, username }
   const [items, setItems] = useState([]);
   const [onlyUnread, setOnlyUnread] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [booting, setBooting] = useState(true);
+
+  // 1) get logged-in user first (requires Authorization header)
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data } = await http.get("/auth/me");
+        setUser(data); // expects { id, username }
+      } catch (e) {
+        console.error("auth/me failed:", e?.response?.data || e.message);
+        // TODO: optionally navigate("/login");
+      } finally {
+        setBooting(false);
+      }
+    })();
+  }, []);
 
   const fetchNotifs = async () => {
+    if (!user) return;
     setLoading(true);
     try {
-      const { data } = await axios.get(`http://localhost:5000/notifications/${userId}`, {
-        params: { onlyUnread }
+      const { data } = await http.get(`/notifications/${user.id}`, {
+        params: { onlyUnread },
       });
       setItems(data.notifications || []);
     } catch (e) {
-      console.error(e);
+      console.error("fetchNotifs error:", e?.response?.data || e.message);
     } finally {
       setLoading(false);
     }
   };
 
+  // 2) fetch whenever filter or user changes
   useEffect(() => {
-    fetchNotifs();
-  }, [onlyUnread]);
+    if (user) fetchNotifs();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, onlyUnread]);
 
   const markRead = async (id) => {
     try {
-      await axios.patch(`http://localhost:5000/notifications/${id}/read`);
-      setItems(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
-      // 🔔 tell Sidebar to refresh unread badge
+      await http.put(`/notifications/${id}/read`);
+      setItems((prev) => prev.map((n) => (n.id === id ? { ...n, wasread: true } : n)));
       window.dispatchEvent(new Event("notificationsUpdated"));
     } catch (e) {
-      console.error(e);
+      console.error("markRead error:", e?.response?.data || e.message);
     }
   };
 
   const markAllRead = async () => {
+    if (!user) return;
     try {
-      await axios.patch(`http://localhost:5000/notifications/${userId}/read-all`);
-      setItems(prev => prev.map(n => ({ ...n, read: true })));
-      // 🔔 tell Sidebar to refresh unread badge
+      await http.put(`/notifications/${user.id}/read-all`);
+      setItems((prev) => prev.map((n) => ({ ...n, wasread: true })));
       window.dispatchEvent(new Event("notificationsUpdated"));
     } catch (e) {
-      console.error(e);
+      console.error("markAllRead error:", e?.response?.data || e.message);
     }
   };
 
   const remove = async (id) => {
     try {
-      await axios.delete(`http://localhost:5000/notifications/${id}`);
-      setItems(prev => prev.filter(n => n.id !== id));
-      // 🔔 tell Sidebar to refresh unread badge
+      await http.delete(`/notifications/${id}`);
+      setItems((prev) => prev.filter((n) => n.id !== id));
       window.dispatchEvent(new Event("notificationsUpdated"));
     } catch (e) {
-      console.error(e);
+      console.error("remove error:", e?.response?.data || e.message);
     }
   };
 
-  // simple type to color mapping
-  const typeColor = (t) =>
-    t === "assignment" ? "primary" :
-    t === "reminder"   ? "warning" :
-    t === "update"     ? "info"    : "secondary";
+  const typeBadge = (n) => {
+    if (n.isassignment) return <Badge bg="primary">assignment</Badge>;
+    if (n.isreminder) return <Badge bg="warning">reminder</Badge>;
+    return <Badge bg="secondary">general</Badge>;
+  };
+
+  const fmtWhen = (ms) => (ms ? new Date(Number(ms)).toLocaleString() : "");
 
   return (
     <>
@@ -84,17 +117,24 @@ function Inbox() {                       // <-- rename component to match file
               label="Only unread"
               checked={onlyUnread}
               onChange={(e) => setOnlyUnread(e.target.checked)}
+              disabled={!user}
             />
-            <Button variant="outline-secondary" onClick={fetchNotifs}>
+            <Button variant="outline-secondary" onClick={fetchNotifs} disabled={!user}>
               Refresh
             </Button>
-            <Button variant="outline-success" onClick={markAllRead}>
+            <Button variant="outline-success" onClick={markAllRead} disabled={!user}>
               Mark all read
             </Button>
           </div>
         </div>
 
-        {loading ? (
+        {booting ? (
+          <div className="text-center py-5">
+            <Spinner animation="border" />
+          </div>
+        ) : !user ? (
+          <p className="text-center text-muted">Please log in to view notifications.</p>
+        ) : loading ? (
           <div className="text-center py-5">
             <Spinner animation="border" />
           </div>
@@ -109,18 +149,16 @@ function Inbox() {                       // <-- rename component to match file
               >
                 <div>
                   <div className="d-flex align-items-center gap-2">
-                    <Badge bg={typeColor(n.type)}>{n.type}</Badge>
-                    {!n.read && <Badge bg="danger">new</Badge>}
+                    {typeBadge(n)}
+                    {!n.wasread && <Badge bg="danger">new</Badge>}
                     <strong>{n.title}</strong>
                   </div>
-                  <div className="text-muted small">
-                    {new Date(n.createdAt).toLocaleString()}
-                  </div>
-                  <div className="mt-1">{n.message}</div>
+                  <div className="text-muted small">{fmtWhen(n.datereceived)}</div>
+                  <div className="mt-1">{n.description}</div>
                 </div>
 
                 <ButtonGroup size="sm">
-                  {!n.read && (
+                  {!n.wasread && (
                     <Button variant="outline-success" onClick={() => markRead(n.id)}>
                       Mark read
                     </Button>
@@ -138,4 +176,4 @@ function Inbox() {                       // <-- rename component to match file
   );
 }
 
-export default Inbox;                    // <-- export the component you defined
+export default Inbox;
