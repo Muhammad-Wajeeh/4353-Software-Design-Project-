@@ -8,40 +8,32 @@ import "./Sidebar.css";
 const Icon = {
   Calendar: (p) => (
     <svg viewBox="0 0 24 24" aria-hidden="true" {...p}>
-      <path fill="currentColor" d="M7 2h2v2h6V2h2v2h2a2 2 0 0 1 2 2v14a2
-      2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h3V2Zm13 8H4v10h16V10Z"/>
+      <path fill="currentColor" d="M7 2h2v2h6V2h2v2h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h3V2Zm13 8H4v10h16V10Z"/>
     </svg>
   ),
   Search: (p) => (
     <svg viewBox="0 0 24 24" aria-hidden="true" {...p}>
-      <path fill="currentColor" d="m21 20-4.2-4.2a7.5 7.5 0 1 0-1.4 1.4L20 21l1-1ZM5.5 11a5.5
-      5.5 0 1 1 11 0a5.5 5.5 0 0 1-11 0Z"/>
+      <path fill="currentColor" d="m21 20-4.2-4.2a7.5 7.5 0 1 0-1.4 1.4L20 21l1-1ZM5.5 11a5.5 5.5 0 1 1 11 0a5.5 5.5 0 0 1-11 0Z"/>
     </svg>
   ),
   Mail: (p) => (
     <svg viewBox="0 0 24 24" aria-hidden="true" {...p}>
-      <path fill="currentColor" d="M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2
-      2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2Zm0 4-8 5L4 8V6l8 5l8-5v2Z"/>
+      <path fill="currentColor" d="M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2Zm0 4-8 5L4 8V6l8 5l8-5v2Z"/>
     </svg>
   ),
   CheckList: (p) => (
     <svg viewBox="0 0 24 24" aria-hidden="true" {...p}>
-      <path fill="currentColor" d="M3 5h12v2H3V5Zm0 6h12v2H3v-2Zm0 6h12v2H3v-2Zm16-9
-      l-1.5-1.5l-1.4 1.4L19 11l4.3-4.3l-1.4-1.4L19 9Z"/>
+      <path fill="currentColor" d="M3 5h12v2H3V5Zm0 6h12v2H3v-2Zm0 6h12v2H3v-2Zm16-9l-1.5-1.5l-1.4 1.4L19 11l4.3-4.3l-1.4-1.4L19 9Z"/>
     </svg>
   ),
   Users: (p) => (
     <svg viewBox="0 0 24 24" aria-hidden="true" {...p}>
-      <path fill="currentColor" d="M16 11a4 4 0 1 0-4-4a4 4 0 0 0 4 4Zm-8 1a4 4 0 1 0-4-4a4
-      4 0 0 0 4 4Zm0 2c-3.3 0-6 1.7-6 4v2h8v-2c0-1.4.7-2.6 1.8-3.4A8 8 0 0 0 8 14Zm8 0c-3.3 0-6
-      1.7-6 4v2h12v-2c0-2.3-2.7-4-6-4Z"/>
+      <path fill="currentColor" d="M16 11a4 4 0 1 0-4-4a4 4 0 0 0 4 4Zm-8 1a4 4 0 1 0-4-4a4 4 0 0 0 4 4Zm0 2c-3.3 0-6 1.7-6 4v2h8v-2c0-1.4.7-2.6 1.8-3.4A8 8 0 0 0 8 14Zm8 0c-3.3 0-6 1.7-6 4v2h12v-2c0-2.3-2.7-4-6-4Z"/>
     </svg>
   ),
   Gear: (p) => (
     <svg viewBox="0 0 24 24" aria-hidden="true" {...p}>
-      <path fill="currentColor" d="M12 8a4 4 0 1 1 0 8a4 4 0 0 1 0-8Zm10 4a8 8 0 0 0-.2-1.8l2-1.6l-2-3.4l-2.5
-      1a8 8 0 0 0-3.1-1.8l-.4-2.6H8.2l-.4 2.6a8 8 0 0 0-3.1 1.8l-2.5-1l-2 3.4l2 1.6A8 8 0 0 0 2 12c0 .6.1 1.2.2 1.8l-2
-      1.6l2 3.4l2.5-1a8 8 0 0 0 3.1 1.8l.4 2.6h7.6l.4-2.6a8 8 0 0 0 3.1-1.8l2.5 1l2-3.4l-2-1.6c.1-.6.2-1.2.2-1.8Z"/>
+      <path fill="currentColor" d="M12 8a4 4 0 1 1 0 8a4 4 0 0 1 0-8Zm10 4a8 8 0 0 0-.2-1.8l2-1.6l-2-3.4l-2.5 1a8 8 0 0 0-3.1-1.8l-.4-2.6H8.2l-.4 2.6a8 8 0 0 0-3.1 1.8l-2.5-1l-2 3.4l2 1.6A8 8 0 0 0 2 12c0 .6.1 1.2.2 1.8l-2 1.6l2 3.4l2.5-1a8 8 0 0 0 3.1 1.8l.4 2.6h7.6l.4-2.6a8 8 0 0 0 3.1-1.8l2.5 1l2-3.4l-2-1.6c.1-.6.2-1.2.2-1.8Z"/>
     </svg>
   ),
   Lock: (p) => (
@@ -71,6 +63,9 @@ export default function Sidebar() {
   const [collapsed, setCollapsed] = useState(initialCollapsed);
   const [unreadNotifs, setUnreadNotifs] = useState(0);
 
+  // Hover card state (label + top position)
+  const [hoverCard, setHoverCard] = useState({ label: null, top: 0 });
+
   useEffect(() => {
     const userId = "u1"; // TODO: wire to auth
     const fetchUnread = async () => {
@@ -92,13 +87,21 @@ export default function Sidebar() {
     localStorage.setItem("vh_sidebar_collapsed", collapsed ? "1" : "0");
   }, [collapsed]);
 
+  const onEnter = (e, label) => {
+    if (!collapsed) return;
+    const r = e.currentTarget.getBoundingClientRect();
+    setHoverCard({ label, top: Math.round(r.top + r.height / 2) });
+  };
+  const onLeave = () => setHoverCard({ label: null, top: 0 });
+
   const Item = ({ to, icon, label, children }) => (
     <NavLink
       to={to}
-      className={({ isActive }) =>
-        `nav-item${isActive ? " active" : ""}`
-      }
+      className={({ isActive }) => `nav-item${isActive ? " active" : ""}`}
       data-label={label}
+      aria-label={label}
+      onMouseEnter={(e) => onEnter(e, label)}
+      onMouseLeave={onLeave}
     >
       <span className="icon">{icon}</span>
       <span className="label-wrap">
@@ -139,6 +142,14 @@ export default function Sidebar() {
         <Item to="/login" icon={<Icon.Lock />} label="Login" />
         <Item to="/logout" icon={<Icon.Door />} label="Log Out" />
       </nav>
+
+      {/* Themed hover card (shown only when collapsed and hovering) */}
+      {collapsed && hoverCard.label && (
+        <div className="hover-card" style={{ top: hoverCard.top }}>
+          <div className="hover-card-arrow" />
+          <div className="hover-card-body">{hoverCard.label}</div>
+        </div>
+      )}
     </aside>
   );
 }

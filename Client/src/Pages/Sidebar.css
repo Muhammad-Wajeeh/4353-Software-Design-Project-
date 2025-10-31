@@ -1,7 +1,12 @@
 /* ===== APP PADDING — prevents overlap ===== */
 body {
-  --sidebar-space: 232px;   /* updated by JS: 232px open, 72px collapsed */
+  --sidebar-space: 232px;   /* 232px open, 72px collapsed (JS updates) */
   --rail: 72px;             /* collapsed width */
+  --vh-blue: #3865e2;
+  --vh-blue-700: #1c3ec3;
+  --card-bg: #ffffff;
+  --card-border: #e5e7eb;
+  --shadow-strong: 0 8px 20px rgba(0,0,0,0.14);
   padding-left: var(--sidebar-space);
   transition: padding-left 200ms ease;
 }
@@ -11,15 +16,14 @@ body {
   position: fixed;
   inset: 0 auto 0 0;
   width: 232px;
-  background: #3865e2;
+  background: var(--vh-blue);
   color: #fff;
   z-index: 1000;
   height: 100vh;
   display: flex;
   flex-direction: column;
   box-shadow: 3px 0 12px rgba(0,0,0,0.15);
-  /* IMPORTANT: allow tooltips to show outside */
-  overflow: visible;
+  overflow: visible;                /* allow hover card to render outside */
   transition: width 160ms ease;
 }
 
@@ -46,78 +50,79 @@ body {
 .sidebar-nav {
   display: flex;
   flex-direction: column;
-  gap: 6px;                        /* uniform vertical rhythm */
+  gap: 6px;
   padding: 8px 8px 12px;
   overflow-y: auto;
+  overflow-x: visible;
   scrollbar-width: none;
 }
 .sidebar-nav::-webkit-scrollbar { display: none; }
 
-/* Items: stable grid (icon | label | badge) — columns NEVER change */
+/* Items: stable grid (icon | label | badge) */
 .nav-item {
   display: grid;
-  grid-template-columns: 24px minmax(0,1fr) auto; /* grid constant in both states */
+  grid-template-columns: 24px minmax(0,1fr) auto; /* constant */
   align-items: center;
   column-gap: 10px;
-  height: 44px;                    /* consistent height */
+  height: 44px;
   padding: 0 10px;
-  border-radius: 9px;
+  border-radius: 10px;
   color: #fff;
   text-decoration: none;
   transition: background 120ms ease, color 120ms ease;
+  position: relative;
 }
-.nav-item:hover { background: #fff; color: #1c3ec3; }
+.nav-item:hover { background: #fff; color: var(--vh-blue-700); }
 .nav-item.active { background: rgba(255,255,255,0.18); }
 .nav-item .counter { margin-left: auto; }
 
-/* Icons always visible */
 .icon { width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; }
 .icon svg { width: 18px; height: 18px; display: block; }
 
-/* Label: wrapped so width snaps (no stretching), only text fades */
+/* Label: width snaps, text fades (no stretch) */
 .label-wrap { overflow: hidden; white-space: nowrap; }
-.label {
-  opacity: 1;
-  transition: opacity 140ms ease;
-}
-
-/* Add a slight delay so labels fade AFTER the panel expands (prevents seeing text appear mid-animation) */
+.label { opacity: 1; transition: opacity 140ms ease; }
 .sidebar:not(.collapsed) .label { transition-delay: 120ms; }
 
 /* Collapsed state */
 .sidebar.collapsed { width: var(--rail); }
-
-/* When collapsed: snap the label area closed instantly, fade text out */
 .sidebar.collapsed .label-wrap { width: 0 !important; }
 .sidebar:not(.collapsed) .label-wrap { width: auto !important; }
 .sidebar.collapsed .label { opacity: 0; pointer-events: none; transition-delay: 0ms; }
 
-/* Keep grid consistent when collapsed (do NOT change columns) */
-/* (No .sidebar.collapsed .nav-item grid change — avoids jank) */
-
-/* Tooltips on hover — visible when collapsed */
-.sidebar.collapsed .nav-item { position: relative; }
-.sidebar.collapsed .nav-item::after {
-  content: attr(data-label);
-  position: absolute;
-  left: calc(var(--rail) + 6px);
-  top: 50%;
+/* ============================
+   THEMED HOVER CARD (React-rendered)
+   Shown only when collapsed and hovering an item
+============================ */
+.hover-card {
+  position: fixed;                     /* relative to viewport for reliability */
+  left: calc(var(--rail) + 12px);
   transform: translateY(-50%);
-  white-space: nowrap;
-  background: rgba(0,0,0,0.85);
-  color: #fff;
-  font-size: 13px;
-  font-weight: 500;
-  padding: 6px 10px;
-  border-radius: 6px;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 120ms ease, transform 120ms ease;
-  z-index: 2000;
+  z-index: 3000;
+  pointer-events: none;                /* ignore mouse so hover doesn't flicker */
 }
-.sidebar.collapsed .nav-item:hover::after {
-  opacity: 1;
-  transform: translateY(-50%) translateX(4px);
+
+.hover-card-body {
+  background: var(--card-bg);
+  color: #111827;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--card-border);
+  box-shadow: var(--shadow-strong);
+}
+
+.hover-card-arrow {
+  position: absolute;
+  left: -6px;
+  top: 50%;
+  transform: translateY(-50%) rotate(45deg);
+  width: 12px; height: 12px;
+  background: var(--card-bg);
+  border-left: 1px solid var(--card-border);
+  border-top: 1px solid var(--card-border);
+  box-shadow: var(--shadow-strong);
 }
 
 /* Links inherit color */
