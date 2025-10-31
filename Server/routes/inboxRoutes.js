@@ -1,108 +1,174 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../DB");
+const authenticateToken = require("./authenticator");
 
-// map DB row -> client shape
-const rowToNotif = (r) => ({
-  id: r.id,
-  user_id: r.user_id,
-  title: r.title,
-  description: r.description,
-  isreminder: r.isreminder,
-  isassignment: r.isassignment,
-  wasread: r.wasread,
-  datereceived: r.datereceived,
-});
+// 🔹 Utility: Map DB row to API response
+function mapNotification(row) {
+  return {
+    notificationId: row.id,
+    userId: row.user_id,
+    title: row.title,
+    description: row.description,
+    isReminder: row.isreminder,
+    isAssignment: row.isassignment,
+    wasRead: row.wasread,
+    dateReceived: row.datereceived,
+  };
+}
 
-// GET /notifications/:user_id?onlyUnread=true
-router.get("/:user_id", async (req, res) => {
+router.get("/getAllForThisUser", authenticateToken, async (req, res) => {
   try {
-    const onlyUnread = String(req.query.onlyUnread || "false").toLowerCase() === "true";
-    const sql = `
+    const userId = req.user.id; // comes from the JWT payload
+
+    console.log("beign hit");
+    const onlyUnread =
+      String(req.query.onlyUnread || "false").toLowerCase() === "true";
+
+    const query = `
       SELECT id, user_id, title, description, isreminder, isassignment, wasread, datereceived
       FROM notifications
       WHERE user_id = $1
-        ${onlyUnread ? "AND wasread = FALSE" : ""}
-      ORDER BY datereceived DESC`;
-    const { rows } = await pool.query(sql, [req.params.user_id]);
-    res.json({ notifications: rows.map(rowToNotif) });
+      ${onlyUnread ? "AND wasread = FALSE" : ""}
+      ORDER BY datereceived DESC
+    `;
+
+    const creatorId = req.user.id; // comes from the JWT payload
+
+    const result = await pool.query(query, [userId]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: "No notifications found" });
+    }
+
+    const notifications = result.rows.map(mapNotification);
+    res.status(200).json({ notifications });
   } catch (err) {
-    console.error("GET /notifications/:user_id error:", err);
-    res.status(500).json({ message: "Server error", detail: err.message });
+    console.error("Error fetching notifications:", err.message);
+    res
+      .status(500)
+      .json({ error: "Server error while fetching notifications" });
   }
 });
 
-// POST /notifications
-router.post("/", async (req, res) => {
+// 🔹 POST /notifications
+router.post("/createNotification", authenticateToken, async (req, res) => {
   try {
-    const { user_id, title, description, isreminder, isassignment } = req.body || {};
-    if (!user_id || !title || !description) {
-      return res.status(400).json({ message: "user_id, title, description required" });
+    const userId = req.user.id; // comes from the JWT payload
+    const { title, description, isReminder, isAssignment } = req.body;
+
+    if (!userId || !title || !description) {
+      return res
+        .status(400)
+        .json({ message: "userId, title, and description are required" });
     }
-    const insert = `
+
+    const insertQuery = `
       INSERT INTO notifications
         (user_id, title, description, isreminder, isassignment, wasread)
       VALUES ($1, $2, $3, $4, $5, FALSE)
-      RETURNING id, user_id, title, description, isreminder, isassignment, wasread, datereceived`;
-    const params = [
-      Number(user_id),
-      String(title),
-      String(description),
-      Boolean(isreminder),
-      Boolean(isassignment),
+      RETURNING id, user_id, title, description, isreminder, isassignment, wasread, datereceived
+    `;
+
+    const values = [
+      userId,
+      title,
+      description,
+      Boolean(isReminder),
+      Boolean(isAssignment),
     ];
-    const { rows } = await pool.query(insert, params);
-    res.status(201).json({ notification: rowToNotif(rows[0]) });
+
+    const result = await pool.query(insertQuery, values);
+    const newNotification = mapNotification(result.rows[0]);
+
+    res.status(201).json({
+      message: "Notification created successfully",
+      notification: newNotification,
+    });
   } catch (err) {
-    console.error("POST /notifications error:", err);
-    res.status(500).json({ message: "Server error", detail: err.message });
+    console.error("Error creating notification:", err.message);
+    res.status(500).json({ error: "Server error while creating notification" });
   }
 });
 
-// PUT /notifications/:id/read
-router.put("/:id/read", async (req, res) => {
+// 🔹 PUT /notifications/:id/read
+router.put("/:id/markAsRead", async (req, res) => {
   try {
-    const { rows } = await pool.query(
-      `UPDATE notifications SET wasread = TRUE WHERE id = $1
-       RETURNING id, user_id, title, description, isreminder, isassignment, wasread, datereceived`,
-      [req.params.id]
-    );
-    if (!rows.length) return res.status(404).json({ message: "Not found" });
-    res.json({ notification: rowToNotif(rows[0]) });
+    const { id } = req.params;
+
+    const updateQuery = `
+      UPDATE notifications
+      SET wasread = TRUE
+      WHERE id = $1
+      RETURNING id, user_id, title, description, isreminder, isassignment, wasread, datereceived
+    `;
+
+    const result = await pool.query(updateQuery, [id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: "Notification not found" });
+    }
+
+    const updated = mapNotification(result.rows[0]);
+    res
+      .status(200)
+      .json({ message: "Notification marked as read", notification: updated });
   } catch (err) {
-    console.error("PUT /notifications/:id/read error:", err);
-    res.status(500).json({ message: "Server error", detail: err.message });
+    console.error("Error marking notification as read:", err.message);
+    res.status(500).json({ error: "Server error while updating notification" });
   }
 });
 
-// PUT /notifications/:user_id/read-all
-router.put("/:user_id/read-all", async (req, res) => {
+// 🔹 PUT /notifications/:userId/read-all
+router.put("/markAllAsReadForThisUser", authenticateToken, async (req, res) => {
   try {
-    const { rowCount } = await pool.query(
-      `UPDATE notifications SET wasread = TRUE WHERE user_id = $1 AND wasread = FALSE`,
-      [req.params.user_id]
+    const userId = req.user.id; // comes from the JWT payload
+
+    const result = await pool.query(
+      `
+      UPDATE notifications
+      SET wasread = TRUE
+      WHERE user_id = $1 AND wasread = FALSE
+    `,
+      [userId]
     );
-    res.json({ message: `Marked ${rowCount} as read` });
+
+    res.status(200).json({
+      message: `Marked ${result.rowCount} notifications as read`,
+    });
   } catch (err) {
-    console.error("PUT /notifications/:user_id/read-all error:", err);
-    res.status(500).json({ message: "Server error", detail: err.message });
+    console.error("Error marking all notifications as read:", err.message);
+    res
+      .status(500)
+      .json({ error: "Server error while updating notifications" });
   }
 });
 
-// DELETE /notifications/:id
-router.delete("/:id", async (req, res) => {
+// 🔹 DELETE /notifications/:id
+router.delete("/delete/:id", async (req, res) => {
   try {
-    const { rows } = await pool.query(
-      `DELETE FROM notifications
-       WHERE id = $1
-       RETURNING id, user_id, title, description, isreminder, isassignment, wasread, datereceived`,
-      [req.params.id]
+    const { id } = req.params;
+
+    const result = await pool.query(
+      `
+      DELETE FROM notifications
+      WHERE id = $1
+      RETURNING id, user_id, title, description, isreminder, isassignment, wasread, datereceived
+    `,
+      [id]
     );
-    if (!rows.length) return res.status(404).json({ message: "Not found" });
-    res.json({ notification: rowToNotif(rows[0]) });
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: "Notification not found" });
+    }
+
+    res.status(200).json({
+      message: "Notification deleted successfully",
+      notification: mapNotification(result.rows[0]),
+    });
   } catch (err) {
-    console.error("DELETE /notifications/:id error:", err);
-    res.status(500).json({ message: "Server error", detail: err.message });
+    console.error("Error deleting notification:", err.message);
+    res.status(500).json({ error: "Server error while deleting notification" });
   }
 });
 
