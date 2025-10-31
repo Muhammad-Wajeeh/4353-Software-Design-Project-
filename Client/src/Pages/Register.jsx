@@ -1,7 +1,9 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, Navigate, Link } from "react-router-dom";
 import Button from "react-bootstrap/Button";
 import Form from "react-bootstrap/Form";
+import Alert from "react-bootstrap/Alert";
+import Spinner from "react-bootstrap/Spinner";
 import Sidebar from "./Sidebar";
 
 /** Optional helpers so we can guard against visiting /register when already authed */
@@ -80,6 +82,13 @@ export default function Register({
     return isTokenValid(t);
   }, []);
 
+  // 🧈 UX sugar: if already authed, show a quick notice then redirect home
+  useEffect(() => {
+    if (!authed) return;
+    const t = setTimeout(() => navigate("/"), 1200);
+    return () => clearTimeout(t);
+  }, [authed, navigate]);
+
   const onSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -106,8 +115,7 @@ export default function Register({
         throw new Error(msg || `Registration failed (${res.status})`);
       }
 
-      // If your server later returns an auto-login token, you could store it here.
-      // For now, after account creation, send users to Login:
+      // After account creation, send users to Login:
       setRedirectToLogin(true);
     } catch (err) {
       setError(err.message || "Registration failed. Please try again.");
@@ -116,10 +124,6 @@ export default function Register({
     }
   };
 
-  if (authed) {
-    // Already logged in? Go home.
-    return <Navigate to="/" replace />;
-  }
   if (redirectToLogin) {
     return <Navigate to="/login" replace />;
   }
@@ -129,97 +133,107 @@ export default function Register({
       {/* ✅ Limited, auth-aware sidebar (Home/Browse visible when logged out) */}
       <Sidebar />
 
-      <div className="container d-flex justify-content-center" style={{ maxWidth: 620 }}>
-        <Form className="w-100 mt-5" onSubmit={onSubmit}>
-          <h3 className="text-center mb-4">Create Account</h3>
+      {/* If already logged in, show brief toast-like notice and spinner before redirect */}
+      {authed ? (
+        <div className="container d-flex flex-column justify-content-center align-items-center" style={{ maxWidth: 720, minHeight: "50vh" }}>
+          <Alert variant="info" className="w-100 text-center">
+            You’re already logged in — redirecting you to your dashboard…
+          </Alert>
+          <Spinner animation="border" role="status" className="mt-2" />
+        </div>
+      ) : (
+        <div className="container d-flex justify-content-center" style={{ maxWidth: 620 }}>
+          <Form className="w-100 mt-5" onSubmit={onSubmit}>
+            <h3 className="text-center mb-4">Create Account</h3>
 
-          <div className="row">
-            <div className="col-12 col-md-6">
-              <Form.Group className="mb-3" controlId="formBasicFirstName">
-                <Form.Label>First Name</Form.Label>
-                <Form.Control
-                  type="text"
-                  placeholder="Enter first name"
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
-                  required
-                  autoComplete="given-name"
-                />
-              </Form.Group>
+            <div className="row">
+              <div className="col-12 col-md-6">
+                <Form.Group className="mb-3" controlId="formBasicFirstName">
+                  <Form.Label>First Name</Form.Label>
+                  <Form.Control
+                    type="text"
+                    placeholder="Enter first name"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    required
+                    autoComplete="given-name"
+                  />
+                </Form.Group>
+              </div>
+              <div className="col-12 col-md-6">
+                <Form.Group className="mb-3" controlId="formBasicLastName">
+                  <Form.Label>Last Name</Form.Label>
+                  <Form.Control
+                    type="text"
+                    placeholder="Enter last name"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    required
+                    autoComplete="family-name"
+                  />
+                </Form.Group>
+              </div>
             </div>
-            <div className="col-12 col-md-6">
-              <Form.Group className="mb-3" controlId="formBasicLastName">
-                <Form.Label>Last Name</Form.Label>
-                <Form.Control
-                  type="text"
-                  placeholder="Enter last name"
-                  value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
-                  required
-                  autoComplete="family-name"
-                />
-              </Form.Group>
+
+            <Form.Group className="mb-3" controlId="formBasicEmail">
+              <Form.Label>Email Address</Form.Label>
+              <Form.Control
+                type="email"
+                placeholder="name@example.com"
+                value={emailVal}
+                onChange={(e) => setEmailVal(e.target.value)}
+                required
+                autoComplete="email"
+              />
+            </Form.Group>
+
+            <Form.Group className="mb-3" controlId="formBasicUsername">
+              <Form.Label>Username</Form.Label>
+              <Form.Control
+                type="text"
+                placeholder="Choose a username"
+                value={usernameVal}
+                onChange={(e) => setUsernameVal(e.target.value)}
+                required
+                autoComplete="username"
+              />
+            </Form.Group>
+
+            <Form.Group className="mb-4" controlId="formBasicPassword">
+              <Form.Label>Password</Form.Label>
+              <Form.Control
+                type="password"
+                placeholder="Create a password"
+                value={passwordVal}
+                onChange={(e) => setPasswordVal(e.target.value)}
+                required
+                autoComplete="new-password"
+                minLength={6}
+              />
+            </Form.Group>
+
+            {error && (
+              <div className="alert alert-danger py-2" role="alert">
+                {error}
+              </div>
+            )}
+
+            <Form.Group className="mb-4">
+              <Button type="submit" variant="primary" className="w-100" disabled={submitting}>
+                {submitting ? "Submitting..." : "Submit"}
+              </Button>
+            </Form.Group>
+
+            <div className="text-center">
+              <Link className="loginAndRegisterLinks" to="/login">
+                Already Have An Account?
+                <br />
+                Login Instead
+              </Link>
             </div>
-          </div>
-
-          <Form.Group className="mb-3" controlId="formBasicEmail">
-            <Form.Label>Email Address</Form.Label>
-            <Form.Control
-              type="email"
-              placeholder="name@example.com"
-              value={emailVal}
-              onChange={(e) => setEmailVal(e.target.value)}
-              required
-              autoComplete="email"
-            />
-          </Form.Group>
-
-          <Form.Group className="mb-3" controlId="formBasicUsername">
-            <Form.Label>Username</Form.Label>
-            <Form.Control
-              type="text"
-              placeholder="Choose a username"
-              value={usernameVal}
-              onChange={(e) => setUsernameVal(e.target.value)}
-              required
-              autoComplete="username"
-            />
-          </Form.Group>
-
-          <Form.Group className="mb-4" controlId="formBasicPassword">
-            <Form.Label>Password</Form.Label>
-            <Form.Control
-              type="password"
-              placeholder="Create a password"
-              value={passwordVal}
-              onChange={(e) => setPasswordVal(e.target.value)}
-              required
-              autoComplete="new-password"
-              minLength={6}
-            />
-          </Form.Group>
-
-          {error && (
-            <div className="alert alert-danger py-2" role="alert">
-              {error}
-            </div>
-          )}
-
-          <Form.Group className="mb-4">
-            <Button type="submit" variant="primary" className="w-100" disabled={submitting}>
-              {submitting ? "Submitting..." : "Submit"}
-            </Button>
-          </Form.Group>
-
-          <div className="text-center">
-            <Link className="loginAndRegisterLinks" to="/login">
-              Already Have An Account?
-              <br />
-              Login Instead
-            </Link>
-          </div>
-        </Form>
-      </div>
+          </Form>
+        </div>
+      )}
     </>
   );
 }
