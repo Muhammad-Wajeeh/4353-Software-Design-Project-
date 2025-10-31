@@ -4,15 +4,27 @@ const router = express.Router();
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
 const pool = require("../DB");
-const { authenticate } = require("../middleware/auth");
+const authenticate = require("./authenticator.js");
+
 
 require("dotenv").config();
 const JWT_SECRET = process.env.JWT_SECRET || "test_secret_fallback";
 
+// ----------------------------
 // POST /auth/register
+// ----------------------------
 router.post("/register", async (req, res) => {
   const { firstName, lastName, username, email, password } = req.body || {};
   try {
+    // optional duplicate check
+    const existing = await pool.query(
+      "SELECT 1 FROM userprofiles WHERE username = $1 OR emailaddress = $2 LIMIT 1",
+      [username, email]
+    );
+    if (existing.rows.length) {
+      return res.status(409).json({ error: "Username or email already exists" });
+    }
+
     const saltRounds = 10;
     const hash = await bcrypt.hash(password, saltRounds);
 
@@ -29,34 +41,36 @@ router.post("/register", async (req, res) => {
   }
 });
 
+// ----------------------------
 // POST /auth/login
+// ----------------------------
 router.post("/login", async (req, res) => {
-  const { username, password } = req.body;
   try {
+    const { username, password } = req.body || {};
+    if (!username || !password) {
+      return res.status(400).json({ error: "Username and password required" });
+    }
+
     const queryResult = await pool.query(
-      "SELECT password, id FROM userprofiles WHERE username = $1",
+      "SELECT id, username, password FROM userprofiles WHERE username = $1",
       [username]
     );
 
     if (queryResult.rows.length === 0) {
       return res.status(404).json({ error: "User not found" });
     }
-    const user = rows[0];
 
+    const user = queryResult.rows[0];
     const ok = await bcrypt.compare(password, user.password);
-    if (!ok) return res.status(401).json({ error: "Invalid credentials" });
+    if (!ok) {
+      return res.status(401).json({ error: "Invalid credentials" });
+    }
 
-    const id = queryResult.rows[0].id;
-    const storedHashedPassword = queryResult.rows[0].password;
-    const isPasswordValid = await bcrypt.compare(
-      password,
-      storedHashedPassword
+    const token = jwt.sign(
+      { id: user.id, username: user.username },
+      JWT_SECRET,
+      { expiresIn: "1h" }
     );
-
-    if (isPasswordValid == true) {
-      const token = jwt.sign({ username: username, id: id }, JWT_SECRET, {
-        expiresIn: "1h",
-      });
 
     res.json({ message: "Login Successful", token });
   } catch (err) {
@@ -65,21 +79,12 @@ router.post("/login", async (req, res) => {
   }
 });
 
-
-async function doesUserExist(username, email) {
-  const existingUser = await pool.query(
-    "SELECT * FROM userprofiles WHERE username = $1 OR emailaddress = $2",
-    [username, email]
-  );
-
-  if (existingUser.rows.length > 0) return true;
-}
-
-// GET /auth/me  (Authorization: Bearer <token>)
+// ----------------------------
+// GET /auth/me
+// ----------------------------
 router.get("/me", authenticate, (req, res) => {
   const { id, username } = req.user || {};
   res.json({ id, username });
 });
-
 
 module.exports = router;
