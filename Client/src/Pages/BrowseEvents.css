@@ -97,3 +97,23 @@
   flex-wrap: wrap;
   gap: 6px;
 }
+
+/* 🔹 Attendance badge (top-left) */
+.attendance-badge {
+  position: absolute;
+  top: 8px;
+  left: 10px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: white;
+}
+
+.attendance-badge.attending {
+  background-color: #28a745; /* green */
+}
+
+.attendance-badge.not-attending {
+  background-color: #6c757d; /* gray */
+}

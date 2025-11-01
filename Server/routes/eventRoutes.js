@@ -23,6 +23,7 @@ router.get("/getall", async (req, res) => {
       eventRequiredSkills: ev.requiredskills,
       eventUrgency: ev.urgency,
       eventDate: ev.date,
+      eventTime: ev.event_time,
       organization: ev.organization,
       hours: ev.hours,
     }));
@@ -44,6 +45,7 @@ router.post("/create", authenticateToken, async (req, res) => {
       eventRequiredSkills,
       eventUrgency,
       eventDate,
+      eventTime,
     } = req.body || {};
 
     // Basic validation
@@ -61,8 +63,8 @@ router.post("/create", authenticateToken, async (req, res) => {
     else if (eventUrgency == "Low") eventUrgencyNumberForm = 0;
 
     const queryResult = await pool.query(
-      `INSERT INTO events (name, description, location, zipcode, requiredskills, urgency, date, creatorid, organization )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      `INSERT INTO events (name, description, location, zipcode, requiredskills, urgency, date, creatorid, organization, event_time )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
       [
         eventName,
         eventDescription,
@@ -72,7 +74,8 @@ router.post("/create", authenticateToken, async (req, res) => {
         eventUrgencyNumberForm,
         eventDate,
         req.user.id, // comes
-        req.user.username
+        req.user.username,
+        eventTime,
       ]
     );
   } catch (err) {
@@ -140,6 +143,7 @@ router.get("/getAllForThisUser", authenticateToken, async (req, res) => {
       eventRequiredSkills: ev.requiredskills,
       eventUrgency: ev.urgency,
       eventDate: ev.date,
+      eventTime: ev.event_time,
       organization: ev.organization,
       hours: ev.hours,
     }));
@@ -147,6 +151,60 @@ router.get("/getAllForThisUser", authenticateToken, async (req, res) => {
     res.status(200).json({ events });
   } catch (err) {
     console.error("Error fetching user's events:", err.message);
+    res.status(500).json({ error: "Server error while fetching events" });
+  }
+});
+
+router.get("/getEventsToAttendByUser", authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id; // comes from the JWT payload
+
+    const queryResult = await pool.query(
+      "SELECT e.name FROM attendance as a JOIN events as e on a.eventid = e.id WHERE a.memberid = $1 AND a.willattend = true",
+      [userId]
+    );
+
+    const eventsAttendedOrToBeAttended = queryResult.rows.map((ev) => ({
+      eventName: ev.name,
+      hasAttended: ev.hasattended,
+      willAttend: ev.willattend,
+    }));
+
+    res.status(200).json({ eventsAttendedOrToBeAttended });
+  } catch (err) {
+    console.error("Error fetching user's events:", err.message);
+    res.status(500).json({ error: "Server error while fetching events" });
+  }
+});
+
+router.get("/getAllFutureEvents", async (req, res) => {
+  try {
+    const result = await pool.query(`
+    SELECT *
+    FROM events
+    WHERE (date + event_time) > NOW()
+    ORDER BY date ASC, event_time ASC
+  `);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: "No events found" });
+    }
+
+    const events = result.rows.map((ev) => ({
+      eventName: ev.name,
+      eventDescription: ev.description,
+      eventLocation: ev.location,
+      eventZipcode: ev.zipcode,
+      eventRequiredSkills: ev.requiredskills,
+      eventUrgency: ev.urgency,
+      eventDate: ev.date,
+      organization: ev.organization,
+      hours: ev.hours,
+    }));
+
+    res.status(200).json({ events });
+  } catch (err) {
+    console.error("Error fetching all events:", err.message);
     res.status(500).json({ error: "Server error while fetching events" });
   }
 });
@@ -213,7 +271,84 @@ router.get("/id/:name", async (req, res) => {
   }
 });
 
-// PUT /event/edit/:id
+router.put("/signup/:eventName", authenticateToken, async (req, res) => {
+  try {
+    const { eventName } = req.params;
+    const userId = req.user.id;
+
+    const eventIdResult = await pool.query(
+      "SELECT id FROM events WHERE name = $1",
+      [eventName]
+    );
+
+    if (eventIdResult.rows.length === 0)
+      return res.status(404).json({ message: "Event not found" });
+
+    const eventId = eventIdResult.rows[0].id;
+
+    const result = await pool.query(
+      `INSERT INTO attendance ( willattend, hasattended, memberid, eventid)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (memberid, eventid)
+       DO UPDATE SET
+         willattend = EXCLUDED.willattend,
+         hasattended = EXCLUDED.hasattended
+       RETURNING *`,
+      [true, false, userId, eventId]
+    );
+
+    if (result.rows.length === 0)
+      return res.status(404).json({ message: "Attendance record not found" });
+
+    res.status(200).json({
+      message: "Signed Up!",
+      event: result.rows[0],
+    });
+  } catch (err) {
+    console.error("Error Signing Up:", err.message);
+    res.status(500).json({ error: "Server error while signing up" });
+  }
+});
+
+router.put("/cancelSignUp/:eventName", authenticateToken, async (req, res) => {
+  try {
+    const { eventName } = req.params;
+    const userId = req.user.id;
+
+    // get event id
+    const eventIdResult = await pool.query(
+      "SELECT id FROM events WHERE name = $1",
+      [eventName]
+    );
+
+    if (eventIdResult.rows.length === 0)
+      return res.status(404).json({ message: "Event not found" });
+
+    const eventId = eventIdResult.rows[0].id;
+
+    // update the attendance record
+    const result = await pool.query(
+      `UPDATE attendance
+       SET willattend = false,
+           hasattended = false
+       WHERE memberid = $1 AND eventid = $2
+       RETURNING *`,
+      [userId, eventId]
+    );
+
+    if (result.rows.length === 0)
+      return res.status(404).json({ message: "Attendance record not found" });
+
+    res.status(200).json({
+      message: "Un-signed successfully!",
+      event: result.rows[0],
+    });
+  } catch (err) {
+    console.error("Error Canceling Sign Up:", err.message);
+    res.status(500).json({ error: "Server error while canceling sign up" });
+  }
+});
+
 router.put("/edit/:id", async (req, res) => {
   try {
     const { id } = req.params;

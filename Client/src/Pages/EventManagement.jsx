@@ -14,6 +14,7 @@ function EventManagement(props) {
   const [localEventUrgency, setLocalEventUrgency] = useState("");
   const [localEventDate, setLocalEventDate] = useState("");
   const [localEventsList, setLocalEventsList] = useState([]);
+  const [localEventTime, setLocalEventTime] = useState("");
 
   const eventName = props.eventName ?? localEventName;
   const setEventName = props.setEventName ?? setLocalEventName;
@@ -42,6 +43,9 @@ function EventManagement(props) {
   const eventsList = props.eventsList ?? localEventsList;
   const setEventsList = props.setEventsList ?? setLocalEventsList;
 
+  const eventTime = props.eventTime ?? localEventTime;
+  const setEventTime = props.setEventTime ?? setLocalEventTime;
+
   const navigate = useNavigate();
 
   const onSubmitForm = async (e) => {
@@ -55,6 +59,7 @@ function EventManagement(props) {
         eventRequiredSkills,
         eventUrgency,
         eventDate,
+        eventTime,
       };
 
       const response = await fetch("http://localhost:5000/event/create", {
@@ -130,6 +135,8 @@ function EventManagement(props) {
       alert("Could not delete event.");
     }
   };
+
+
 
   const handleEdit = (name) => {
     navigate(`/events/edit/${encodeURIComponent(name)}`);
@@ -252,6 +259,15 @@ function EventManagement(props) {
             />
           </Form.Group>
 
+          <Form.Group className="mb-3">
+            <Form.Label>Event Time</Form.Label>
+            <Form.Control
+              type="time"
+              value={eventTime}
+              onChange={(e) => setEventTime(e.target.value)}
+            />
+          </Form.Group>
+
           <Button type="submit" variant="primary">
             Save Event
           </Button>
@@ -263,14 +279,17 @@ function EventManagement(props) {
               <Card.Body>
                 <Card.Title>{event.name ?? event.eventName}</Card.Title>
                 <Card.Subtitle className="mb-2 text-muted">
-                  {event.location ?? event.eventLocation}
+                  {event.eventLocation}
                 </Card.Subtitle>
                 <Card.Subtitle className="mb-2 text-muted">
-                  {event.date ?? event.eventDate}
+                  {(event.eventDate || "").split("T")[0] || "No Date"}
                 </Card.Subtitle>
-                <Card.Text>
-                  {event.description ?? event.eventDescription}
-                </Card.Text>
+
+                <Card.Subtitle className="mb-2 text-muted">
+                  {event.eventTime}
+                </Card.Subtitle>
+
+                <Card.Text>{event.eventDescription}</Card.Text>
               </Card.Body>
 
               <Card.Body>
