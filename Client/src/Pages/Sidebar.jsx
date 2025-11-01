@@ -6,11 +6,6 @@ import "./Sidebar.css";
 
 /* Inline SVG icons */
 const Icon = {
-  Home: (p) => (
-    <svg viewBox="0 0 24 24" aria-hidden="true" {...p}>
-      <path fill="currentColor" d="M12 3L2 12h3v8h6v-5h2v5h6v-8h3L12 3Z" />
-    </svg>
-  ),
   Calendar: (p) => (
     <svg viewBox="0 0 24 24" aria-hidden="true" {...p}>
       <path fill="currentColor" d="M7 2h2v2h6V2h2v2h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h3V2Zm13 8H4v10h16V10Z"/>
@@ -58,30 +53,6 @@ const Icon = {
   ),
 };
 
-function decodeJwt(token) {
-  try {
-    const base64Url = token.split(".")[1];
-    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
-    const jsonPayload = decodeURIComponent(
-      atob(base64)
-        .split("")
-        .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
-        .join("")
-    );
-    return JSON.parse(jsonPayload);
-  } catch {
-    return null;
-  }
-}
-
-function isTokenValid(token) {
-  if (!token) return false;
-  const decoded = decodeJwt(token);
-  if (!decoded?.exp) return true;
-  const now = Math.floor(Date.now() / 1000);
-  return decoded.exp > now;
-}
-
 export default function Sidebar() {
   const location = useLocation();
 
@@ -95,20 +66,13 @@ export default function Sidebar() {
   // Hover card state (label + top position)
   const [hoverCard, setHoverCard] = useState({ label: null, top: 0 });
 
-  const token =
-    typeof window !== "undefined" ? localStorage.getItem("token") : null;
-  const authed = isTokenValid(token);
-
   useEffect(() => {
+    const userId = "u1"; // TODO: wire to auth
     const fetchUnread = async () => {
       try {
-        if (!authed) return setUnreadNotifs(0);
         const { data } = await axios.get(
-          "http://localhost:5000/notifications/getAllForThisUser",
-          {
-            headers: { Authorization: `Bearer ${token}` },
-            params: { onlyUnread: true },
-          }
+          `http://localhost:5000/notifications/${userId}`,
+          { params: { onlyUnread: true } }
         );
         setUnreadNotifs((data.notifications || []).length);
       } catch {
@@ -116,12 +80,7 @@ export default function Sidebar() {
       }
     };
     fetchUnread();
-
-    const handleRefresh = () => fetchUnread();
-    window.addEventListener("notificationsUpdated", handleRefresh);
-    return () => window.removeEventListener("notificationsUpdated", handleRefresh);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.pathname, authed, token]);
+  }, [location.pathname]);
 
   useEffect(() => {
     document.body.style.setProperty("--sidebar-space", collapsed ? "72px" : "232px");
@@ -167,37 +126,21 @@ export default function Sidebar() {
       </div>
 
       <nav className="sidebar-nav">
-        {/* Home visible to everyone */}
-        <Item to="/" icon={<Icon.Home />} label="Home" />
-
-        {/* Always-visible public browsing */}
+        <Item to="/eventmanagement" icon={<Icon.Calendar />} label="Event Management" />
+        <Item to="/profilemanagement" icon={<Icon.Users />} label="Profile Management" />
         <Item to="/BrowseEvents" icon={<Icon.Search />} label="Browse Events" />
-
-        {/* Auth-only items */}
-        {authed && (
-          <>
-            <Item to="/eventmanagement" icon={<Icon.Calendar />} label="Event Management" />
-            <Item to="/profilemanagement" icon={<Icon.Users />} label="Profile Management" />
-            <Item to="/inbox" icon={<Icon.Mail />} label="Inbox">
-              {unreadNotifs > 0 && (
-                <Badge bg="danger" pill className="counter">{unreadNotifs}</Badge>
-              )}
-            </Item>
-            <Item to="/eventlist" icon={<Icon.CheckList />} label="Assignments" />
-            <Item to="/VolunteerMatching" icon={<Icon.Users />} label="Volunteer Matching" />
-            <Item to="/VolunteerHistory" icon={<Icon.History />} label="Volunteer History" />
-            <Item to="/settings" icon={<Icon.Gear />} label="Settings" />
-          </>
-        )}
-
-        {/* Auth gates for auth links */}
-        {!authed && (
-          <>
-            <Item to="/register" icon={<Icon.Lock />} label="Register" />
-            <Item to="/login" icon={<Icon.Lock />} label="Login" />
-          </>
-        )}
-        {authed && <Item to="/logout" icon={<Icon.Door />} label="Log Out" />}
+        <Item to="/inbox" icon={<Icon.Mail />} label="Inbox">
+          {unreadNotifs > 0 && (
+            <Badge bg="danger" pill className="counter">{unreadNotifs}</Badge>
+          )}
+        </Item>
+        <Item to="/eventlist" icon={<Icon.CheckList />} label="Assignments" />
+        <Item to="/VolunteerMatching" icon={<Icon.Users />} label="Volunteer Matching" />
+        <Item to="/VolunteerHistory" icon={<Icon.History />} label="Volunteer History" />
+        <Item to="/settings" icon={<Icon.Gear />} label="Settings" />
+        <Item to="/register" icon={<Icon.Lock />} label="Register" />
+        <Item to="/login" icon={<Icon.Lock />} label="Login" />
+        <Item to="/logout" icon={<Icon.Door />} label="Log Out" />
       </nav>
 
       {/* Themed hover card (shown only when collapsed and hovering) */}
