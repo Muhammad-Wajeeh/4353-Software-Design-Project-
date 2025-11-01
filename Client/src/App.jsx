@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import "./App.css";
 import Login from "./Pages/Login";
@@ -17,6 +17,7 @@ import Home from "./Pages/Home";
 import PublicHome from "./Pages/PublicHome";
 import Logout from "./Pages/Logout";
 
+
 function decodeJwt(token) {
   try {
     const base64Url = token.split(".")[1];
@@ -32,33 +33,16 @@ function decodeJwt(token) {
     return null;
   }
 }
+
 function isTokenValid(token) {
   if (!token) return false;
-  const d = decodeJwt(token);
-  if (!d?.exp) return true;
-  return d.exp > Math.floor(Date.now() / 1000);
-}
-
-function useAuth() {
-  const getAuthed = () => isTokenValid(localStorage.getItem("token"));
-  const [authed, setAuthed] = useState(getAuthed);
-
-  useEffect(() => {
-    const onStorage = () => setAuthed(getAuthed());
-    window.addEventListener("storage", onStorage);
-    // allow manual dispatch from code (we already do this on login/logout)
-    window.addEventListener("auth-changed", onStorage);
-    return () => {
-      window.removeEventListener("storage", onStorage);
-      window.removeEventListener("auth-changed", onStorage);
-    };
-  }, []);
-
-  return authed;
+  const decoded = decodeJwt(token);
+  if (!decoded?.exp) return true; // be permissive if exp missing
+  const now = Math.floor(Date.now() / 1000);
+  return decoded.exp > now;
 }
 
 function App() {
-  // keep your state exactly as before
   const [count, setCount] = useState(0);
   const [memberFirstName, setMemberFirstName] = useState("");
   const [memberLastName, setMemberLastName] = useState("");
@@ -76,82 +60,96 @@ function App() {
   const [eventDate, setEventDate] = useState("");
   const [eventsList, setEventsList] = useState([]);
 
-  // ✅ reactive auth state
-  const authed = useAuth();
+  const authed = useMemo(
+    () => isTokenValid(typeof window !== "undefined" ? localStorage.getItem("token") : null),
+    []
+  );
 
   return (
-    <Router>
-      <Routes>
-        {/* Root shows member dashboard if authed, otherwise public landing */}
-        <Route path="/" element={authed ? <Home /> : <PublicHome />} />
+    <>
+      <Router>
+        <Routes>
+          {/* Root shows member dashboard if authed, otherwise public landing */}
+          <Route path="/" element={authed ? <Home /> : <PublicHome />} />
 
-        <Route
-          path="/Login"
-          element={
-            <Login
-              loginUsername={loginUsername}
-              setLoginUsername={setLoginUsername}
-              loginPassword={loginPassword}
-              setLoginPassword={setLoginPassword}
-            />
-          }
-        />
-        <Route
-          path="/Register"
-          element={
-            <Register
-              memberFirstName={memberFirstName}
-              setMemberFirstName={setMemberFirstName}
-              memberLastName={memberLastName}
-              setMemberLastName={setMemberLastName}
-              email={email}
-              setEmail={setEmail}
-              username={username}
-              setUsername={setUsername}
-              password={password}
-              setPassword={setPassword}
-            />
-          }
-        />
-        <Route path="/logout" element={<Logout />} />
+          {/* Keep all existing routes */}
+          <Route
+            path="/Login"
+            element={
+              <Login
+                loginUsername={loginUsername}
+                setLoginUsername={setLoginUsername}
+                loginPassword={loginPassword}
+                setLoginPassword={setLoginPassword}
+              ></Login>
+            }
+          />
+          <Route
+            path="/Register"
+            element={
+              <Register
+                memberFirstName={memberFirstName}
+                setMemberFirstName={setMemberFirstName}
+                memberLastName={memberLastName}
+                setMemberLastName={setMemberLastName}
+                email={email}
+                setEmail={setEmail}
+                username={username}
+                setUsername={setUsername}
+                password={password}
+                setPassword={setPassword}
+              />
+            }
+          />
+          <Route 
+            path="/logout" 
+            element={
+              <Logout 
+              />
+            } 
+          />
+          <Route
+            path="/ProfileManagement"
+            element={<ProfileManagement></ProfileManagement>}
+          />
 
-        <Route path="/ProfileManagement" element={<ProfileManagement />} />
-        <Route
-          path="/EventManagement"
-          element={
-            <EventManagement
-              eventName={eventName}
-              setEventName={setEventName}
-              eventDescription={eventDescription}
-              setEventDescription={setEventDescription}
-              eventLocation={eventLocation}
-              setEventLocation={setEventLocation}
-              eventZipCode={eventZipCode}
-              setEventZipCode={setEventZipCode}
-              eventRequiredSkills={eventRequiredSkills}
-              setEventRequiredSkills={setEventRequiredSkills}
-              eventUrgency={eventUrgency}
-              setEventUrgency={setEventUrgency}
-              eventDate={eventDate}
-              setEventDate={setEventDate}
-              eventsList={eventsList}
-              setEventsList={setEventsList}
-            />
-          }
-        />
+          <Route
+            path="/EventManagement"
+            element={
+              <EventManagement
+                eventName={eventName}
+                setEventName={setEventName}
+                eventDescription={eventDescription}
+                setEventDescription={setEventDescription}
+                eventLocation={eventLocation}
+                setEventLocation={setEventLocation}
+                eventZipCode={eventZipCode}
+                setEventZipCode={setEventZipCode}
+                eventRequiredSkills={eventRequiredSkills}
+                setEventRequiredSkills={setEventRequiredSkills}
+                eventUrgency={eventUrgency}
+                setEventUrgency={setEventUrgency}
+                eventDate={eventDate}
+                setEventDate={setEventDate}
+                eventsList={eventsList}
+                setEventsList={setEventsList}
+              />
+            }
+          />
 
-        <Route path="/BrowseEvents" element={<BrowseEvents />} />
-        <Route path="/VolunteerHistory" element={<VolunteerHistory />} />
-        <Route path="/VolunteerMatching" element={<VolunteerMatching />} />
-        <Route path="/events/edit/:eventName" element={<EditEvent />} />
-        <Route path="/inbox" element={<Inbox />} />
-        <Route path="/events/:id" element={<EventDetails />} />
-        <Route path="/history/event/:eventId" element={<HistoryDetails />} />
+          <Route path="/BrowseEvents" element={<BrowseEvents />} />
+          <Route path="/VolunteerHistory" element={<VolunteerHistory />} />
+          <Route path="/VolunteerMatching" element={<VolunteerMatching />} />
+          <Route path="/events/edit/:eventName" element={<EditEvent />} />
+          <Route path="/inbox" element={<Inbox />} />
+          <Route path="/events/:id" element={<EventDetails />} />
+          <Route path="/history/event/:eventId" element={<HistoryDetails />} />
 
-        {/* Fallback */}
-        <Route path="*" element={<Sidebar />} />
-      </Routes>
-    </Router>
+          {/* Fallback (keep your old behavior) */}
+          <Route path="*" element={<Sidebar />} />
+        </Routes>
+      </Router>
+    </>
   );
 }
 
