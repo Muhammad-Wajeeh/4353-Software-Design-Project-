@@ -60,24 +60,25 @@ function VolunteerHistory() {
   return (
     <>
       <Sidebar />
-      {history.map((event) => (
-        <Table hover variant="">
-          <thead>
-            <tr>
-              <th>Event Name</th>
-              <th>Event Date </th>
-              <th>Organization</th>
-            </tr>
-          </thead>
-          <tbody>
+
+      <Table hover variant="">
+        <thead>
+          <tr>
+            <th>Event Name</th>
+            <th>Event Date </th>
+            <th>Organization</th>
+          </tr>
+        </thead>
+        <tbody>
+          {history.map((event) => (
             <tr>
               <td>{event.name}</td>
               <td>{(event.date || "").split("T")[0] || "No Date"}</td>
               <td>SASE</td>
             </tr>
-          </tbody>
-        </Table>
-      ))}
+          ))}
+        </tbody>
+      </Table>
     </>
   );
 }
