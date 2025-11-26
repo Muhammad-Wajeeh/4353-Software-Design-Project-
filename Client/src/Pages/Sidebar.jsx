@@ -239,7 +239,6 @@ export default function Sidebar() {
               icon={<Icon.History />}
               label="Volunteer History"
             />
-            <Item to="/settings" icon={<Icon.Gear />} label="Settings" />
           </>
         )}
 
