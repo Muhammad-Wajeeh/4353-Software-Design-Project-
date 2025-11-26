@@ -4,11 +4,11 @@
   align-items: flex-start;
   gap: 2rem;
   padding: 2rem 2rem;
-  width: 75vw;
+  width: 70vw;
 }
 
 .formSection {
-  width: 50%;
+  width: 40%;
 }
 
 .formAndCards .card {
@@ -31,6 +31,7 @@
 }
 
 .cardsContainer {
+  width: 60%;
   display: flex;
   flex-wrap: wrap; /* allows wrapping to next row */
   gap: 1.5rem; /* space between cards */

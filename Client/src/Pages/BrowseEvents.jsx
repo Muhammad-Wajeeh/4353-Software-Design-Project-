@@ -2,10 +2,13 @@ import Sidebar from "./Sidebar";
 import { useEffect, useState } from "react";
 import { Form, Button, Card } from "react-bootstrap";
 import "./BrowseEvents.css";
+import { useParams, useNavigate } from "react-router-dom";
 
 function BrowseEvents() {
   const [events, setEvents] = useState([]);
   const [eventsToAttend, setEventsToAttend] = useState([]);
+
+  const navigate = useNavigate();
 
   const getEvents = async () => {
     try {
@@ -63,28 +66,7 @@ function BrowseEvents() {
     }
   };
 
-  const onClickSignUpButton = async (eventNameToBeSignedUpFor) => {
-    try {
-      const response = await fetch(
-        `http://localhost:5000/event/signup/${encodeURIComponent(
-          eventNameToBeSignedUpFor
-        )}`,
-        {
-          method: "PUT", // or "GET" depending on your backend route
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        }
-      );
-
-      if (!response.ok) throw new Error("Sign Up failed");
-      await getEventsToAttendByUser(); // re-fetch updated list
-    } catch (error) {
-      console.error(error);
-      alert("Could not sign up.");
-    }
-  };
+  
 
   const onClickCancelSignUpButton = async (eventNameToBeSignedUpFor) => {
     try {
@@ -204,7 +186,13 @@ function BrowseEvents() {
                     ) : (
                       <Button
                         variant="success"
-                        onClick={() => onClickSignUpButton(event.eventName)}
+                        onClick={() =>
+                          navigate(
+                            `/events/EventSignup/${encodeURIComponent(
+                              event.eventName
+                            )}`
+                          )
+                        }
                       >
                         Sign Up
                       </Button>

@@ -42,11 +42,21 @@ router.post("/create", authenticateToken, async (req, res) => {
       eventDescription,
       eventLocation,
       eventZipCode,
-      eventRequiredSkills,
+      skillNeeds,
       eventUrgency,
       eventDate,
       eventTime,
     } = req.body || {};
+
+    const {
+      firstAid,
+      foodService,
+      logistics,
+      teaching,
+      eventSetup,
+      dataEntry,
+      customerService,
+    } = skillNeeds;
 
     // Basic validation
     if (!eventName || !eventDate) {
@@ -63,19 +73,25 @@ router.post("/create", authenticateToken, async (req, res) => {
     else if (eventUrgency == "Low") eventUrgencyNumberForm = 0;
 
     const queryResult = await pool.query(
-      `INSERT INTO events (name, description, location, zipcode, requiredskills, urgency, date, creatorid, organization, event_time )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+      `INSERT INTO events (name, description, location, zipcode, urgency, date, creatorid, organization, event_time, firstaid, foodservice, logistics, teaching, eventsetup, dataentry, customerservice )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
       [
         eventName,
         eventDescription,
         eventLocation,
         eventZipCode,
-        eventRequiredSkills,
         eventUrgencyNumberForm,
         eventDate,
-        req.user.id, // comes
+        req.user.id,
         req.user.username,
         eventTime,
+        firstAid,
+        foodService,
+        logistics,
+        teaching,
+        eventSetup,
+        dataEntry,
+        customerService,
       ]
     );
   } catch (err) {
@@ -177,6 +193,41 @@ router.get("/getEventsToAttendByUser", authenticateToken, async (req, res) => {
   }
 });
 
+router.get(
+  "/getEventsToAttendByUserAndThePosition",
+  authenticateToken,
+  async (req, res) => {
+    try {
+      const userId = req.user.id;
+
+      const query = `
+        SELECT 
+          e.id AS eventID,
+          e.name AS eventName,
+          e.date AS eventDate,
+          e.location AS eventLocation,
+          a.skill AS skill,
+          a.willattend AS willAttend,
+          a.hasattended AS hasAttended
+        FROM attendance a
+        JOIN events e ON a.eventid = e.id
+        WHERE a.memberid = $1 AND a.willattend = true;
+      `;
+
+      const result = await pool.query(query, [userId]);
+
+      return res.status(200).json({
+        events: result.rows,
+      });
+    } catch (err) {
+      console.error("Error fetching user assignments:", err.message);
+      return res.status(500).json({
+        error: "Server error while fetching assignments",
+      });
+    }
+  }
+);
+
 router.get("/getAllFutureEvents", async (req, res) => {
   try {
     const result = await pool.query(`
@@ -213,31 +264,47 @@ router.get("/:name", async (req, res) => {
   try {
     const { name } = req.params;
 
-    if (!name) {
-      return res.status(400).json({ error: "Event name is required" });
-    }
+    if (!name) return res.status(400).json({ error: "Event name is required" });
 
-    // Query PostgreSQL
     const result = await pool.query("SELECT * FROM events WHERE name = $1", [
       name,
     ]);
 
-    if (result.rows.length === 0) {
+    if (result.rows.length === 0)
       return res.status(404).json({ error: "Event not found" });
-    }
 
     const ev = result.rows[0];
 
     res.status(200).json({
+      eventID: ev.id,
       eventName: ev.name,
       eventDescription: ev.description,
       eventLocation: ev.location,
-      eventZipcode: ev.zipcode,
-      eventRequiredSkills: ev.requiredskills,
+      eventZipCode: ev.zipcode,
+
       eventUrgency: ev.urgency,
       eventDate: ev.date,
+      eventTime: ev.event_time,
       organization: ev.organization,
       hours: ev.hours,
+
+      // --- SKILL NEEDS ---
+      firstAid: ev.firstaid,
+      foodService: ev.foodservice,
+      logistics: ev.logistics,
+      teaching: ev.teaching,
+      eventSetup: ev.eventsetup,
+      dataEntry: ev.dataentry,
+      customerService: ev.customerservice,
+
+      // --- SKILL FILLED ---
+      firstAidFilled: ev.firstaidfilled,
+      foodServiceFilled: ev.foodservicefilled,
+      logisticsFilled: ev.logisticsfilled,
+      teachingFilled: ev.teachingfilled,
+      eventSetupFilled: ev.eventsetupfilled,
+      dataEntryFilled: ev.dataentryfilled,
+      customerServiceFilled: ev.customerservicefilled,
     });
   } catch (err) {
     console.error("Error fetching event:", err.message);
@@ -274,38 +341,65 @@ router.get("/id/:name", async (req, res) => {
 router.put("/signup/:eventName", authenticateToken, async (req, res) => {
   try {
     const { eventName } = req.params;
+    const { skill } = req.body;
     const userId = req.user.id;
 
-    const eventIdResult = await pool.query(
-      "SELECT id FROM events WHERE name = $1",
+    if (!skill) {
+      return res.status(400).json({ error: "Skill is required to sign up" });
+    }
+
+    const skillColumn = skill.toLowerCase(); // e.g. foodService → foodservice
+    const filledColumn = skillColumn + "filled"; // e.g. foodservicefilled
+
+    // 1️⃣ Get event row
+    const eventResult = await pool.query(
+      "SELECT * FROM events WHERE name = $1",
       [eventName]
     );
 
-    if (eventIdResult.rows.length === 0)
-      return res.status(404).json({ message: "Event not found" });
+    if (eventResult.rows.length === 0)
+      return res.status(404).json({ error: "Event not found" });
 
-    const eventId = eventIdResult.rows[0].id;
+    const ev = eventResult.rows[0];
 
-    const result = await pool.query(
-      `INSERT INTO attendance ( willattend, hasattended, memberid, eventid)
-       VALUES ($1, $2, $3, $4)
-       ON CONFLICT (memberid, eventid)
-       DO UPDATE SET
-         willattend = EXCLUDED.willattend,
-         hasattended = EXCLUDED.hasattended
-       RETURNING *`,
-      [true, false, userId, eventId]
+    const totalNeeded = ev[skillColumn];
+    const alreadyFilled = ev[filledColumn];
+
+    if (totalNeeded === undefined) {
+      return res.status(400).json({ error: "Invalid skill type" });
+    }
+
+    // 2️⃣ Prevent signing up if full
+    if (alreadyFilled >= totalNeeded) {
+      return res.status(400).json({
+        error: `No available slots left for ${skill}`,
+      });
+    }
+
+    // 3️⃣ Upsert attendance + store skill
+    const attendance = await pool.query(
+      `
+      INSERT INTO attendance (memberid, eventid, willattend, hasattended, skill)
+      VALUES ($1, $2, true, false, $3)
+      ON CONFLICT (memberid, eventid)
+      DO UPDATE SET willattend = true, skill = EXCLUDED.skill
+      RETURNING *;
+      `,
+      [userId, ev.id, skill]
     );
 
-    if (result.rows.length === 0)
-      return res.status(404).json({ message: "Attendance record not found" });
+    // 4️⃣ Increment the correct skillFilled column
+    await pool.query(
+      `UPDATE events SET ${filledColumn} = ${filledColumn} + 1 WHERE id = $1`,
+      [ev.id]
+    );
 
     res.status(200).json({
-      message: "Signed Up!",
-      event: result.rows[0],
+      message: `Signed up for ${skill}!`,
+      event: attendance.rows[0],
     });
   } catch (err) {
-    console.error("Error Signing Up:", err.message);
+    console.error("Error Signing Up:", err);
     res.status(500).json({ error: "Server error while signing up" });
   }
 });
@@ -315,36 +409,60 @@ router.put("/cancelSignUp/:eventName", authenticateToken, async (req, res) => {
     const { eventName } = req.params;
     const userId = req.user.id;
 
-    // get event id
-    const eventIdResult = await pool.query(
-      "SELECT id FROM events WHERE name = $1",
+    // 1️⃣ Get event row
+    const eventResult = await pool.query(
+      "SELECT * FROM events WHERE name = $1",
       [eventName]
     );
 
-    if (eventIdResult.rows.length === 0)
+    if (eventResult.rows.length === 0)
       return res.status(404).json({ message: "Event not found" });
 
-    const eventId = eventIdResult.rows[0].id;
+    const ev = eventResult.rows[0];
 
-    // update the attendance record
-    const result = await pool.query(
-      `UPDATE attendance
-       SET willattend = false,
-           hasattended = false
-       WHERE memberid = $1 AND eventid = $2
-       RETURNING *`,
-      [userId, eventId]
+    // 2️⃣ Get the user's current skill
+    const attendanceResult = await pool.query(
+      "SELECT skill FROM attendance WHERE memberid = $1 AND eventid = $2",
+      [userId, ev.id]
     );
 
-    if (result.rows.length === 0)
+    if (attendanceResult.rows.length === 0)
       return res.status(404).json({ message: "Attendance record not found" });
+
+    const oldSkill = attendanceResult.rows[0].skill; // e.g. "foodService"
+
+    // If the user had chosen a skill previously:
+    if (oldSkill) {
+      const filledColumn = oldSkill.toLowerCase() + "filled";
+
+      // 3️⃣ Decrement skill filled count (never go below 0)
+      await pool.query(
+        `UPDATE events
+         SET ${filledColumn} = GREATEST(${filledColumn} - 1, 0)
+         WHERE id = $1`,
+        [ev.id]
+      );
+    }
+
+    // 4️⃣ Null the skill and mark willattend false
+    const updateAttendance = await pool.query(
+      `
+      UPDATE attendance
+      SET willattend = false,
+          hasattended = false,
+          skill = NULL
+      WHERE memberid = $1 AND eventid = $2
+      RETURNING *
+      `,
+      [userId, ev.id]
+    );
 
     res.status(200).json({
       message: "Un-signed successfully!",
-      event: result.rows[0],
+      event: updateAttendance.rows[0],
     });
   } catch (err) {
-    console.error("Error Canceling Sign Up:", err.message);
+    console.error("Error Canceling Sign Up:", err);
     res.status(500).json({ error: "Server error while canceling sign up" });
   }
 });

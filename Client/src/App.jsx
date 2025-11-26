@@ -16,6 +16,8 @@ import BrowseEvents from "./Pages/BrowseEvents";
 import Home from "./Pages/Home";
 import PublicHome from "./Pages/PublicHome";
 import Logout from "./Pages/Logout";
+import EventSignup from "./Pages/EventSignup";
+import Assignments from "./Pages/Assignments";
 
 function decodeJwt(token) {
   try {
@@ -147,6 +149,11 @@ function App() {
         <Route path="/inbox" element={<Inbox />} />
         <Route path="/events/:id" element={<EventDetails />} />
         <Route path="/history/event/:eventId" element={<HistoryDetails />} />
+        <Route
+          path="/events/eventsignup/:eventName"
+          element={<EventSignup />}
+        />
+        <Route path="/Assignments" element={<Assignments />} />
 
         {/* Fallback */}
         <Route path="*" element={<Sidebar />} />

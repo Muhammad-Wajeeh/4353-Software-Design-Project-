@@ -15,6 +15,15 @@ function EventManagement(props) {
   const [localEventDate, setLocalEventDate] = useState("");
   const [localEventsList, setLocalEventsList] = useState([]);
   const [localEventTime, setLocalEventTime] = useState("");
+  const [skillNeeds, setSkillNeeds] = useState({
+    firstAid: 0,
+    foodService: 0,
+    logistics: 0,
+    teaching: 0,
+    eventSetup: 0,
+    dataEntry: 0,
+    customerService: 0,
+  });
 
   const eventName = props.eventName ?? localEventName;
   const setEventName = props.setEventName ?? setLocalEventName;
@@ -56,7 +65,7 @@ function EventManagement(props) {
         eventDescription,
         eventLocation,
         eventZipCode,
-        eventRequiredSkills,
+        skillNeeds,
         eventUrgency,
         eventDate,
         eventTime,
@@ -82,7 +91,15 @@ function EventManagement(props) {
       setEventDescription("");
       setEventLocation("");
       setEventZipCode("");
-      setEventRequiredSkills([]);
+      setSkillNeeds({
+        firstAid: 0,
+        foodService: 0,
+        logistics: 0,
+        teaching: 0,
+        eventSetup: 0,
+        dataEntry: 0,
+        customerService: 0,
+      });
       setEventUrgency("");
       setEventDate("");
       alert("Event created!");
@@ -136,8 +153,6 @@ function EventManagement(props) {
     }
   };
 
-
-
   const handleEdit = (name) => {
     navigate(`/events/edit/${encodeURIComponent(name)}`);
   };
@@ -152,7 +167,9 @@ function EventManagement(props) {
       <Form className="formAndCards" onSubmit={onSubmitForm}>
         <div className="formSection">
           <Form.Group className="mb-3" controlId="emEventName">
-            <Form.Label>Event Name</Form.Label>
+            <Form.Label style={{ paddingBottom: "5px", fontWeight: "bold" }}>
+              Event Name
+            </Form.Label>
             <Form.Control
               type="text"
               placeholder="Enter event name"
@@ -166,7 +183,9 @@ function EventManagement(props) {
           </Form.Group>
 
           <Form.Group className="mb-3" controlId="emDescription">
-            <Form.Label>Event Description</Form.Label>
+            <Form.Label style={{ paddingBottom: "5px", fontWeight: "bold" }}>
+              Event Description
+            </Form.Label>
             <Form.Control
               as="textarea"
               rows={5}
@@ -179,7 +198,9 @@ function EventManagement(props) {
           </Form.Group>
 
           <Form.Group className="mb-3" controlId="emLocation">
-            <Form.Label>Location</Form.Label>
+            <Form.Label style={{ paddingBottom: "5px", fontWeight: "bold" }}>
+              Location
+            </Form.Label>
             <Form.Control
               as="textarea"
               rows={2}
@@ -192,7 +213,9 @@ function EventManagement(props) {
           </Form.Group>
 
           <Form.Group className="mb-3" controlId="emZipCode">
-            <Form.Label>Zip Code</Form.Label>
+            <Form.Label style={{ paddingBottom: "5px", fontWeight: "bold" }}>
+              Zip Code
+            </Form.Label>
             <Form.Control
               type="number"
               placeholder="Enter Zip/Postal Code"
@@ -204,36 +227,41 @@ function EventManagement(props) {
           </Form.Group>
 
           <Form.Group className="mb-3" controlId="emRequiredSkills">
-            <Form.Label>Required Skills</Form.Label>
-            <Form.Select
-              multiple
-              required
-              name="requiredSkills"
-              style={{ minHeight: 140 }}
-              value={eventRequiredSkills}
-              onChange={(e) => {
-                const selected = Array.from(
-                  e.target.selectedOptions,
-                  (option) => option.value
-                );
-                setEventRequiredSkills(selected);
-              }}
-            >
-              <option value="First Aid">First Aid</option>
-              <option value="Food Service">Food Service</option>
-              <option value="Logistics">Logistics</option>
-              <option value="Teaching">Teaching</option>
-              <option value="Event Setup">Event Setup</option>
-              <option value="Data Entry">Data Entry</option>
-              <option value="Customer Service">Customer Service</option>
-            </Form.Select>
-            <Form.Text muted>
-              Select one or more skills (Ctrl/Cmd + click).
-            </Form.Text>
+            <Form.Label>Number Of People Required For Each Skill</Form.Label>
+
+            <div className="skillsGrid">
+              {[
+                ["firstAid", "First Aid"],
+                ["foodService", "Food Service"],
+                ["logistics", "Logistics"],
+                ["teaching", "Teaching"],
+                ["eventSetup", "Event Setup"],
+                ["dataEntry", "Data Entry"],
+                ["customerService", "Customer Service"],
+              ].map(([key, label]) => (
+                <div className="skillRow" key={key}>
+                  <Form.Label className="skillLabel">{label}</Form.Label>
+                  <Form.Control
+                    type="number"
+                    min="0"
+                    value={skillNeeds[key]}
+                    onChange={(e) =>
+                      setSkillNeeds({
+                        ...skillNeeds,
+                        [key]: Number(e.target.value),
+                      })
+                    }
+                    className="skillInput"
+                  />
+                </div>
+              ))}
+            </div>
           </Form.Group>
 
           <Form.Group className="mb-3" controlId="emUrgency">
-            <Form.Label>Urgency</Form.Label>
+            <Form.Label style={{ paddingBottom: "5px", fontWeight: "bold" }}>
+              Urgency
+            </Form.Label>
             <Form.Select
               required
               name="urgency"
@@ -249,7 +277,9 @@ function EventManagement(props) {
           </Form.Group>
 
           <Form.Group className="mb-3" controlId="emEventDate">
-            <Form.Label>Event Date</Form.Label>
+            <Form.Label style={{ paddingBottom: "5px", fontWeight: "bold" }}>
+              Event Date
+            </Form.Label>
             <Form.Control
               type="date"
               required
@@ -260,7 +290,9 @@ function EventManagement(props) {
           </Form.Group>
 
           <Form.Group className="mb-3">
-            <Form.Label>Event Time</Form.Label>
+            <Form.Label style={{ paddingBottom: "5px", fontWeight: "bold" }}>
+              Event Time
+            </Form.Label>
             <Form.Control
               type="time"
               value={eventTime}
@@ -293,13 +325,13 @@ function EventManagement(props) {
               </Card.Body>
 
               <Card.Body>
-                <div>
+                <div style={{ display: "flex" }}>
                   <Button
                     variant="primary"
                     className="editAndDeleteButtons"
                     onClick={() => handleEdit(event.name ?? event.eventName)}
                   >
-                    edit
+                    View/Edit
                   </Button>
                   <Button
                     variant="primary"
@@ -308,7 +340,7 @@ function EventManagement(props) {
                       onClickDeleteButton(event.name ?? event.eventName)
                     }
                   >
-                    delete
+                    Delete
                   </Button>
                 </div>
               </Card.Body>

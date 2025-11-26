@@ -9,6 +9,15 @@ function EditEvent() {
 
   const [eventID, setEventID] = useState();
   const [event, setEvent] = useState(null);
+  const [skillNeeds, setSkillNeeds] = useState({
+    firstAid: 0,
+    foodService: 0,
+    logistics: 0,
+    teaching: 0,
+    eventSetup: 0,
+    dataEntry: 0,
+    customerService: 0,
+  });
 
   const onSubmitForm = async (e) => {
     e.preventDefault();
@@ -18,7 +27,10 @@ function EditEvent() {
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(event),
+          body: JSON.stringify({
+            ...event,
+            skillNeeds: skillNeeds,
+          }),
         }
       );
       if (response.ok) {
@@ -35,43 +47,38 @@ function EditEvent() {
 
   const fetchEvent = async () => {
     try {
-      const idResponse = await fetch(
-        `http://localhost:5000/event/id/${encodeURIComponent(eventName)}`,
-        { method: "GET", headers: { "Content-Type": "application/json" } }
-      );
-
-      if (!idResponse.ok) throw new Error("Failed to get event ID");
-      const idData = await idResponse.json();
-
-      setEventID(idData.event.id);
-
       const response = await fetch(
-        `http://localhost:5000/event/${encodeURIComponent(eventName)}`,
-        { method: "GET", headers: { "Content-Type": "application/json" } }
+        `http://localhost:5000/event/${encodeURIComponent(eventName)}`
       );
+
       if (!response.ok) throw new Error("Fetch failed");
+
       const data = await response.json();
 
-      // data shape comes from the server alias in eventRoutes.js
-      const formattedDate = data.eventDate
-        ? new Date(data.eventDate).toISOString().split("T")[0]
-        : "";
+      setEventID(data.eventID);
+
+      const urgencyMap = { 0: "Low", 1: "Medium", 2: "High", 3: "Critical" };
 
       setEvent({
-        eventName: data.eventName || "",
-        eventDescription: data.eventDescription || "",
-        eventLocation: data.eventLocation || "",
-        eventZipCode: data.eventZipCode || "",
-        eventRequiredSkills: Array.isArray(data.eventRequiredSkills)
-          ? data.eventRequiredSkills
-          : data.eventRequiredSkills
-          ? [data.eventRequiredSkills]
-          : [],
-        eventUrgency: data.eventUrgency || "",
-        eventDate: formattedDate,
+        eventName: data.eventName,
+        eventDescription: data.eventDescription,
+        eventLocation: data.eventLocation,
+        eventZipCode: data.eventZipCode,
+        eventUrgency: urgencyMap[data.eventUrgency],
+        eventDate: new Date(data.eventDate).toISOString().split("T")[0],
       });
-    } catch (e) {
-      console.error(e);
+
+      setSkillNeeds({
+        firstAid: data.firstAid,
+        foodService: data.foodService,
+        logistics: data.logistics,
+        teaching: data.teaching,
+        eventSetup: data.eventSetup,
+        dataEntry: data.dataEntry,
+        customerService: data.customerService,
+      });
+    } catch (err) {
+      console.error(err);
       alert("Could not load event.");
       navigate("/eventmanagement");
     }
@@ -87,9 +94,9 @@ function EditEvent() {
   return (
     <>
       <Sidebar />
-      <Form onSubmit={onSubmitForm} className="p-3">
+      <Form onSubmit={onSubmitForm} className="p-3" style={{ width: "50vw" }}>
         <Form.Group className="mb-3" controlId="emEventName">
-          <Form.Label>Event Name</Form.Label>
+          <Form.Label style={{ fontWeight: "bold" }}>Event Name</Form.Label>
           <Form.Control
             type="text"
             placeholder="Enter event name"
@@ -106,7 +113,9 @@ function EditEvent() {
         </Form.Group>
 
         <Form.Group className="mb-3" controlId="emDescription">
-          <Form.Label>Event Description</Form.Label>
+          <Form.Label style={{ fontWeight: "bold" }}>
+            Event Description
+          </Form.Label>
           <Form.Control
             as="textarea"
             rows={5}
@@ -124,7 +133,7 @@ function EditEvent() {
         </Form.Group>
 
         <Form.Group className="mb-3" controlId="emLocation">
-          <Form.Label>Location</Form.Label>
+          <Form.Label style={{ fontWeight: "bold" }}>Location</Form.Label>
           <Form.Control
             as="textarea"
             rows={2}
@@ -139,7 +148,7 @@ function EditEvent() {
         </Form.Group>
 
         <Form.Group className="mb-3" controlId="emZipCode">
-          <Form.Label>Zip Code</Form.Label>
+          <Form.Label style={{ fontWeight: "bold" }}>Zip Code</Form.Label>
           <Form.Control
             type="number"
             placeholder="Enter Zip/Postal Code"
@@ -153,38 +162,37 @@ function EditEvent() {
         </Form.Group>
 
         <Form.Group className="mb-3" controlId="emRequiredSkills">
-          <Form.Label>Required Skills</Form.Label>
-          <Form.Select
-            multiple
-            required
-            name="requiredSkills"
-            style={{ minHeight: 140 }}
-            value={event.eventRequiredSkills}
-            onChange={(e) =>
-              setEvent((prev) => ({
-                ...prev,
-                eventRequiredSkills: Array.from(
-                  e.target.selectedOptions,
-                  (option) => option.value
-                ),
-              }))
-            }
-          >
-            <option value="First Aid">First Aid</option>
-            <option value="Food Service">Food Service</option>
-            <option value="Logistics">Logistics</option>
-            <option value="Teaching">Teaching</option>
-            <option value="Event Setup">Event Setup</option>
-            <option value="Data Entry">Data Entry</option>
-            <option value="Customer Service">Customer Service</option>
-          </Form.Select>
-          <Form.Text muted>
-            Select one or more skills (Ctrl/Cmd + click).
-          </Form.Text>
+          <Form.Label className="fw-bold" style={{ fontWeight: "bold" }}>
+            Number Of People Required For Each Skill
+          </Form.Label>
+
+          {[
+            ["firstAid", "First Aid"],
+            ["foodService", "Food Service"],
+            ["logistics", "Logistics"],
+            ["teaching", "Teaching"],
+            ["eventSetup", "Event Setup"],
+            ["dataEntry", "Data Entry"],
+            ["customerService", "Customer Service"],
+          ].map(([key, label]) => (
+            <div key={key} className="d-flex flex-column mb-2">
+              <Form.Label>{label}</Form.Label>
+              <Form.Control
+                type="number"
+                value={skillNeeds[key]}
+                onChange={(e) =>
+                  setSkillNeeds({
+                    ...skillNeeds,
+                    [key]: Number(e.target.value),
+                  })
+                }
+              />
+            </div>
+          ))}
         </Form.Group>
 
         <Form.Group className="mb-3" controlId="emUrgency">
-          <Form.Label>Urgency</Form.Label>
+          <Form.Label style={{ fontWeight: "bold" }}>Urgency</Form.Label>
           <Form.Select
             required
             name="urgency"
@@ -202,7 +210,7 @@ function EditEvent() {
         </Form.Group>
 
         <Form.Group className="mb-3" controlId="emEventDate">
-          <Form.Label>Event Date</Form.Label>
+          <Form.Label style={{ fontWeight: "bold" }}>Event Date</Form.Label>
           <Form.Control
             type="date"
             required
