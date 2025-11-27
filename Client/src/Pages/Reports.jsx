@@ -23,19 +23,32 @@ const fmtDate = (iso) =>
     : "";
 
 export default function Reports() {
-  const [activeTab, setActiveTab] = useState("volunteers"); // "volunteers" | "events"
+  // "volunteers" | "events" | "my-volunteers" | "my-assignments"
+  const [activeTab, setActiveTab] = useState("volunteers");
+
   const [volunteers, setVolunteers] = useState([]);
   const [events, setEvents] = useState([]);
+
   const [loadingVolunteers, setLoadingVolunteers] = useState(true);
   const [loadingEvents, setLoadingEvents] = useState(true);
+
+  // "My events" and per-event data
+  const [myEvents, setMyEvents] = useState([]);
+  const [loadingMyEvents, setLoadingMyEvents] = useState(false);
+  const [selectedMyEventId, setSelectedMyEventId] = useState("");
+  const [myEventVolunteers, setMyEventVolunteers] = useState([]);
+  const [myEventAssignments, setMyEventAssignments] = useState([]);
+  const [loadingMyDetail, setLoadingMyDetail] = useState(false);
 
   const token =
     typeof window !== "undefined" ? localStorage.getItem("token") : null;
 
+  // Initial load: global reports + list of "my events"
   useEffect(() => {
     if (!token) {
       setLoadingVolunteers(false);
       setLoadingEvents(false);
+      setLoadingMyEvents(false);
       return;
     }
 
@@ -43,7 +56,7 @@ export default function Reports() {
 
     (async () => {
       try {
-        // volunteers report
+        // volunteers report (global)
         const vRes = await axios.get(`${API_BASE}/reports/volunteers`, {
           headers,
         });
@@ -57,7 +70,7 @@ export default function Reports() {
       }
 
       try {
-        // events report
+        // events report (global)
         const eRes = await axios.get(`${API_BASE}/reports/events`, {
           headers,
         });
@@ -67,14 +80,68 @@ export default function Reports() {
       } finally {
         setLoadingEvents(false);
       }
+
+      try {
+        setLoadingMyEvents(true);
+        const myRes = await axios.get(`${API_BASE}/reports/my-events`, {
+          headers,
+        });
+        setMyEvents(Array.isArray(myRes.data.events) ? myRes.data.events : []);
+      } catch (err) {
+        console.error("Failed to load my events list", err);
+        setMyEvents([]);
+      } finally {
+        setLoadingMyEvents(false);
+      }
     })();
   }, [token]);
+
+  // Load per-event data when user selects one of their events
+  useEffect(() => {
+    if (!token || !selectedMyEventId) return;
+    const headers = { Authorization: `Bearer ${token}` };
+
+    (async () => {
+      try {
+        setLoadingMyDetail(true);
+
+        if (activeTab === "my-volunteers") {
+          const res = await axios.get(
+            `${API_BASE}/reports/my-events/${selectedMyEventId}/volunteers`,
+            { headers }
+          );
+          setMyEventVolunteers(res.data.volunteers || []);
+        } else if (activeTab === "my-assignments") {
+          const res = await axios.get(
+            `${API_BASE}/reports/my-events/${selectedMyEventId}/assignments`,
+            { headers }
+          );
+          setMyEventAssignments(res.data.assignments || []);
+        }
+      } catch (err) {
+        console.error("Failed to load per-event report", err);
+        if (activeTab === "my-volunteers") {
+          setMyEventVolunteers([]);
+        } else if (activeTab === "my-assignments") {
+          setMyEventAssignments([]);
+        }
+      } finally {
+        setLoadingMyDetail(false);
+      }
+    })();
+  }, [activeTab, selectedMyEventId, token]);
 
   const downloadCsv = async (kind) => {
     if (!token) {
       alert("You must be logged in to download reports.");
       return;
     }
+
+    if (kind !== "volunteers" && kind !== "events") {
+      alert("CSV export is currently available only for global reports.");
+      return;
+    }
+
     const headers = { Authorization: `Bearer ${token}` };
 
     const url =
@@ -105,8 +172,13 @@ export default function Reports() {
     }
   };
 
-  // -------- PDF generation (client-side) --------
+  // -------- PDF generation (client-side, global only for now) --------
   const downloadPdf = () => {
+    if (activeTab !== "volunteers" && activeTab !== "events") {
+      alert("PDF export is currently available only for global reports.");
+      return;
+    }
+
     const doc = new jsPDF({
       orientation: "portrait",
       unit: "pt",
@@ -144,7 +216,6 @@ export default function Reports() {
     doc.setFontSize(16);
     doc.text(title, marginLeft, 40);
 
-    // use autoTable helper function instead of doc.autoTable
     autoTable(doc, {
       startY: 60,
       head,
@@ -244,8 +315,123 @@ export default function Reports() {
     );
   };
 
-  const renderBody = () =>
-    activeTab === "volunteers" ? renderVolunteerTable() : renderEventTable();
+  const renderMyVolunteersTable = () => {
+    if (!selectedMyEventId) {
+      return <p className="text-muted">Choose one of your events above.</p>;
+    }
+
+    if (loadingMyDetail) {
+      return (
+        <div className="text-center py-4">
+          <Spinner animation="border" />
+        </div>
+      );
+    }
+
+    if (!myEventVolunteers.length) {
+      return (
+        <p className="text-muted">No volunteers for this event yet.</p>
+      );
+    }
+
+    return (
+      <div className="table-responsive">
+        <table className="table table-sm align-middle">
+          <thead>
+            <tr>
+              <th>Volunteer</th>
+              <th>Username</th>
+              <th>Email</th>
+              <th className="text-end">This event: hours</th>
+              <th className="text-end">This event: status</th>
+              <th className="text-end">Total events</th>
+              <th className="text-end">Total hours</th>
+            </tr>
+          </thead>
+          <tbody>
+            {myEventVolunteers.map((v) => (
+              <tr key={v.id}>
+                <td>{v.fullname || "—"}</td>
+                <td>{v.username || "—"}</td>
+                <td>{v.email || "—"}</td>
+                <td className="text-end">
+                  {v.hours_this_event !== null && v.hours_this_event !== undefined
+                    ? v.hours_this_event
+                    : "—"}
+                </td>
+                <td className="text-end">
+                  {v.status_this_event || "—"}
+                </td>
+                <td className="text-end">{v.total_events || 0}</td>
+                <td className="text-end">{v.total_hours || 0}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  };
+
+  const renderMyAssignmentsTable = () => {
+    if (!selectedMyEventId) {
+      return <p className="text-muted">Choose one of your events above.</p>;
+    }
+
+    if (loadingMyDetail) {
+      return (
+        <div className="text-center py-4">
+          <Spinner animation="border" />
+        </div>
+      );
+    }
+
+    if (!myEventAssignments.length) {
+      return (
+        <p className="text-muted">No assignments yet for this event.</p>
+      );
+    }
+
+    return (
+      <div className="table-responsive">
+        <table className="table table-sm align-middle">
+          <thead>
+            <tr>
+              <th>Role</th>
+              <th>Volunteer</th>
+              <th>Username</th>
+              <th>Email</th>
+              <th className="text-end">Hours</th>
+              <th className="text-end">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {myEventAssignments.map((a, idx) => (
+              <tr key={idx}>
+                <td>{a.skill || "—"}</td>
+                <td>{a.fullname || "—"}</td>
+                <td>{a.username || "—"}</td>
+                <td>{a.email || "—"}</td>
+                <td className="text-end">
+                  {a.hours !== null && a.hours !== undefined ? a.hours : "—"}
+                </td>
+                <td className="text-end">{a.status || "—"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  };
+
+  const renderBody = () => {
+    if (activeTab === "volunteers") return renderVolunteerTable();
+    if (activeTab === "events") return renderEventTable();
+    if (activeTab === "my-volunteers") return renderMyVolunteersTable();
+    if (activeTab === "my-assignments") return renderMyAssignmentsTable();
+    return null;
+  };
+
+  const isGlobalTab = activeTab === "volunteers" || activeTab === "events";
 
   return (
     <>
@@ -253,21 +439,59 @@ export default function Reports() {
       <div className="container mt-4" style={{ maxWidth: 1100 }}>
         <div className="d-flex justify-content-between align-items-center mb-3">
           <h2 className="m-0">Reports</h2>
-          <Form className="d-flex gap-2">
+          <Form className="d-flex gap-2 align-items-center">
             <Form.Select
               size="sm"
               value={activeTab}
-              onChange={(e) => setActiveTab(e.target.value)}
-              style={{ width: 220 }}
+              onChange={(e) => {
+                setActiveTab(e.target.value);
+                setSelectedMyEventId("");
+                setMyEventVolunteers([]);
+                setMyEventAssignments([]);
+              }}
+              style={{ width: 260 }}
             >
-              <option value="volunteers">Volunteer participation</option>
-              <option value="events">Event assignments</option>
+              <option value="volunteers">
+                Volunteer participation (all volunteers)
+              </option>
+              <option value="events">
+                Event assignments (all events)
+              </option>
+              <option value="my-volunteers">
+                My events – volunteers + history
+              </option>
+              <option value="my-assignments">
+                My events – assignments by position
+              </option>
             </Form.Select>
+
+            {(activeTab === "my-volunteers" ||
+              activeTab === "my-assignments") && (
+              <Form.Select
+                size="sm"
+                value={selectedMyEventId}
+                onChange={(e) => setSelectedMyEventId(e.target.value)}
+                style={{ width: 260 }}
+                disabled={loadingMyEvents}
+              >
+                <option value="">
+                  {loadingMyEvents
+                    ? "Loading your events..."
+                    : "Select one of your events…"}
+                </option>
+                {myEvents.map((ev) => (
+                  <option key={ev.id} value={ev.id}>
+                    {fmtDate(ev.date)} – {ev.name}
+                  </option>
+                ))}
+              </Form.Select>
+            )}
 
             <Button
               variant="outline-primary"
               size="sm"
               onClick={() => downloadCsv(activeTab)}
+              disabled={!isGlobalTab}
             >
               Download CSV
             </Button>
@@ -275,6 +499,7 @@ export default function Reports() {
               variant="outline-secondary"
               size="sm"
               onClick={downloadPdf}
+              disabled={!isGlobalTab}
             >
               Download PDF
             </Button>
@@ -286,9 +511,10 @@ export default function Reports() {
         </Card>
 
         <p className="text-muted small mt-3">
-          CSV reports can be opened in Excel, Google Sheets, or imported into
-          other tools. PDF reports are generated in your browser and can be
-          saved or printed.
+          CSV and PDF exports are available for the global reports. For your
+          event-specific reports, use the dropdown to select one of your
+          created events and review volunteers and assignments directly in the
+          dashboard.
         </p>
       </div>
     </>
