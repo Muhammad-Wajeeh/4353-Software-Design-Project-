@@ -57,7 +57,7 @@ const rowToUser = (r) => {
         fri: !!r.isavailablefri,
         sat: !!r.isavailablesat,
       },
-      // legacy dates array (your new UI uses dates array; DB keeps DoW flags)
+      // legacy dates array (your UI no longer uses real dates, just DoW flags)
       dates: [],
     },
     maxDistanceFromEvents: r.maxdistancefromevents || "",
@@ -123,7 +123,7 @@ router.get("/:userId", async (req, res) => {
 // Accepts partial updates.
 // Supports:
 //  - availability.days.{sun..sat} booleans (new way)
-//  - availability:{dates:[...]} / dates array (accepted but ignored by DB)
+//  - top-level isavailablesun / isavailablemon / ... (legacy / current frontend)
 router.put("/:userId", async (req, res) => {
   try {
     const userId = String(req.params.userId).trim();
@@ -141,8 +141,10 @@ router.put("/:userId", async (req, res) => {
       skills,
       preferences,
       maxDistanceFromEvents,
-      availability, // {days:{sun..sat}} or dates[]
+      availability, // {days:{sun..sat}} or similar
     } = req.body || {};
+
+    console.log("PUT /profile body:", JSON.stringify(req.body));
 
     // basic validation
     const errors = [];
@@ -205,7 +207,11 @@ router.put("/:userId", async (req, res) => {
 
     // preferences: if object, store JSON; if string, store as-is
     if (preferences !== undefined) {
-      if (preferences && typeof preferences === "object" && !Array.isArray(preferences)) {
+      if (
+        preferences &&
+        typeof preferences === "object" &&
+        !Array.isArray(preferences)
+      ) {
         set("preferences", JSON.stringify(preferences));
       } else if (preferences == null) {
         set("preferences", null);
@@ -214,10 +220,10 @@ router.put("/:userId", async (req, res) => {
       }
     }
 
-    // availability (new DoW booleans supported)
+    // ---- availability handling ----
+    // 1) Preferred shape: availability.days.{sun..sat}
     if (availability !== undefined) {
       const days = availability?.days ?? availability; // allow {days:{...}} or {sun:..}
-
       if (days && typeof days === "object" && !Array.isArray(days)) {
         if (days.sun !== undefined) set("isavailablesun", !!days.sun);
         if (days.mon !== undefined) set("isavailablemon", !!days.mon);
@@ -227,7 +233,26 @@ router.put("/:userId", async (req, res) => {
         if (days.fri !== undefined) set("isavailablefri", !!days.fri);
         if (days.sat !== undefined) set("isavailablesat", !!days.sat);
       }
-      // {dates:[]} is accepted but ignored for DB; we’re using DoW flags.
+      // dates array is accepted but ignored by DB
+    } else {
+      // 2) Legacy / current shape: top-level isavailable* flags
+      const {
+        isavailablesun,
+        isavailablemon,
+        isavailabletue,
+        isavailablewed,
+        isavailablethu,
+        isavailablefri,
+        isavailablesat,
+      } = req.body;
+
+      if (isavailablesun !== undefined) set("isavailablesun", !!isavailablesun);
+      if (isavailablemon !== undefined) set("isavailablemon", !!isavailablemon);
+      if (isavailabletue !== undefined) set("isavailabletue", !!isavailabletue);
+      if (isavailablewed !== undefined) set("isavailablewed", !!isavailablewed);
+      if (isavailablethu !== undefined) set("isavailablethu", !!isavailablethu);
+      if (isavailablefri !== undefined) set("isavailablefri", !!isavailablefri);
+      if (isavailablesat !== undefined) set("isavailablesat", !!isavailablesat);
     }
 
     if (!sets.length) {

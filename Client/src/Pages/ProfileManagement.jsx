@@ -1,31 +1,8 @@
+// Client/src/Pages/ProfileManagement.jsx
 import axios from "axios";
 import React, { useEffect, useState } from "react";
 import { Form, Button, Badge } from "react-bootstrap";
-import DatePicker from "react-datepicker";
-import "react-datepicker/dist/react-datepicker.css";
 import Sidebar from "./Sidebar";
-
-const prettyDateFormatter = new Intl.DateTimeFormat(undefined, {
-  weekday: "short",
-  year: "numeric",
-  month: "short",
-  day: "numeric",
-});
-
-const fmtPretty = (iso) => {
-  try {
-    return prettyDateFormatter.format(new Date(iso));
-  } catch {
-    return iso || "";
-  }
-};
-
-const fmt = (d) =>
-  d
-    ? new Date(d.getFullYear(), d.getMonth(), d.getDate())
-        .toISOString()
-        .slice(0, 10)
-    : "";
 
 // ---- JWT helper (for fallback if vh_userId missing) ----
 function decodeJwt(token) {
@@ -60,6 +37,16 @@ const getUserId = () => {
   return null;
 };
 
+const DAY_LABELS = {
+  sun: "Sunday",
+  mon: "Monday",
+  tue: "Tuesday",
+  wed: "Wednesday",
+  thu: "Thursday",
+  fri: "Friday",
+  sat: "Saturday",
+};
+
 export default function ProfileManagement() {
   const [mode, setMode] = useState("view");
   const [validated, setValidated] = useState(false);
@@ -74,8 +61,16 @@ export default function ProfileManagement() {
   const [preferences, setPreferences] = useState("");
   const [maxDistance, setMaxDistance] = useState("");
 
-  const [picked, setPicked] = useState(null);
-  const [availability, setAvailability] = useState([]);
+  // New: day-of-week availability (Sun–Sat)
+  const [availability, setAvailability] = useState({
+    sun: false,
+    mon: false,
+    tue: false,
+    wed: false,
+    thu: false,
+    fri: false,
+    sat: false,
+  });
 
   const userId = getUserId();
 
@@ -112,28 +107,23 @@ export default function ProfileManagement() {
       setMaxDistance("");
     }
 
-    if (u?.availability?.dates && Array.isArray(u.availability.dates)) {
-      setAvailability(u.availability.dates);
-    } else {
-      setAvailability([]);
-    }
+    // ✅ New: hydrate availability from API's availability.days object
+    const daysFromServer = (u.availability && u.availability.days) || {};
+
+    setAvailability({
+      sun: !!(daysFromServer.sun ?? u.isavailablesun ?? u.isAvailableSun),
+      mon: !!(daysFromServer.mon ?? u.isavailablemon ?? u.isAvailableMon),
+      tue: !!(daysFromServer.tue ?? u.isavailabletue ?? u.isAvailableTue),
+      wed: !!(daysFromServer.wed ?? u.isavailablewed ?? u.isAvailableWed),
+      thu: !!(daysFromServer.thu ?? u.isavailablethu ?? u.isAvailableThu),
+      fri: !!(daysFromServer.fri ?? u.isavailablefri ?? u.isAvailableFri),
+      sat: !!(daysFromServer.sat ?? u.isavailablesat ?? u.isAvailableSat),
+    });
   };
 
   useEffect(() => {
     fetchProfile().catch((e) => console.error("Load profile failed", e));
   }, [userId]);
-
-  // ----- helpers -----
-  const addDate = () => {
-    if (!picked) return;
-    const iso = fmt(picked);
-    setAvailability((arr) => (arr.includes(iso) ? arr : [...arr, iso].sort()));
-    setPicked(null);
-  };
-
-  const removeDate = (iso) => {
-    setAvailability((arr) => arr.filter((d) => d !== iso));
-  };
 
   const enterEdit = () => {
     setValidated(false);
@@ -152,9 +142,12 @@ export default function ProfileManagement() {
 
     const form = e.currentTarget;
     const baseValid = form.checkValidity();
-    const datesValid = availability.length > 0;
+
+    // at least one day must be selected
+    const hasAnyDay = Object.values(availability).some(Boolean);
+
     setValidated(true);
-    if (!(baseValid && datesValid)) return;
+    if (!(baseValid && hasAnyDay)) return;
 
     const locParts = [city, stateUS, zip]
       .map((s) => (s || "").trim())
@@ -169,7 +162,6 @@ export default function ProfileManagement() {
       state: stateUS.trim(),
       zip: zip.trim(),
       skills: skillsSel,
-      availability: { dates: availability },
       preferences: {
         notes: preferences,
         maxDistanceMiles:
@@ -179,6 +171,16 @@ export default function ProfileManagement() {
             ? Number(maxDistance)
             : undefined,
       },
+      // New: day-of-week availability booleans for userprofiles table
+      isavailablesun: availability.sun,
+      isavailablemon: availability.mon,
+      isavailabletue: availability.tue,
+      isavailablewed: availability.wed,
+      isavailablethu: availability.thu,
+      isavailablefri: availability.fri,
+      isavailablesat: availability.sat,
+      // (optional, if you want to also send structured availability)
+      availability: { days: availability },
     };
 
     if (location) {
@@ -207,6 +209,10 @@ export default function ProfileManagement() {
         <span className="fw-semibold">{value || "—"}</span>
       </div>
     );
+
+    const selectedDays = Object.entries(availability)
+      .filter(([, v]) => v)
+      .map(([k]) => DAY_LABELS[k]);
 
     return (
       <>
@@ -280,18 +286,20 @@ export default function ProfileManagement() {
                 </div>
               </div>
 
-              {/* Availability as pretty date pills */}
+              {/* Availability as weekday pills */}
               <div>
-                <div className="text-muted small">Availability (dates)</div>
-                {availability?.length ? (
+                <div className="text-muted small">Availability (days)</div>
+                {selectedDays.length ? (
                   <div className="mt-2 d-flex flex-wrap gap-2">
-                    {availability.map((d) => (
-                      <span
-                        key={d}
-                        className="badge rounded-pill text-bg-light border"
+                    {selectedDays.map((label) => (
+                      <Badge
+                        key={label}
+                        bg="light"
+                        text="dark"
+                        className="border"
                       >
-                        {fmtPretty(d)}
-                      </span>
+                        {label}
+                      </Badge>
                     ))}
                   </div>
                 ) : (
@@ -486,45 +494,35 @@ export default function ProfileManagement() {
             </div>
           </div>
 
+          {/* New: day-of-week availability selector */}
           <Form.Group className="mb-3" controlId="pmAvailability">
-            <Form.Label>Availability (multiple dates)</Form.Label>
-            <div className="d-flex gap-2 align-items-start mb-2">
-              <DatePicker
-                selected={picked}
-                onChange={(d) => setPicked(d)}
-                placeholderText="Select a date"
-                className={`form-control ${
-                  validated && availability.length === 0 ? "is-invalid" : ""
-                }`}
-              />
-              <Button type="button" variant="outline-primary" onClick={addDate}>
-                Add
-              </Button>
+            <Form.Label>Availability (days of the week)</Form.Label>
+            <div className="d-flex flex-wrap gap-2">
+              {Object.entries(DAY_LABELS).map(([key, label]) => (
+                <Button
+                  key={key}
+                  type="button"
+                  size="sm"
+                  variant={availability[key] ? "success" : "outline-secondary"}
+                  onClick={() =>
+                    setAvailability((prev) => ({
+                      ...prev,
+                      [key]: !prev[key],
+                    }))
+                  }
+                >
+                  {label}
+                </Button>
+              ))}
             </div>
-            {validated && availability.length === 0 && (
+            {validated && !Object.values(availability).some(Boolean) && (
               <div className="invalid-feedback d-block">
-                Please add at least one availability date.
+                Please select at least one available day.
               </div>
             )}
-
-            {availability.length > 0 && (
-              <div className="mt-1">
-                {availability.map((d) => (
-                  <Badge key={d} bg="secondary" className="me-2 mb-2">
-                    {d}{" "}
-                    <Button
-                      size="sm"
-                      variant="link"
-                      className="text-white text-decoration-none p-0 ms-1"
-                      onClick={() => removeDate(d)}
-                      aria-label={`Remove ${d}`}
-                    >
-                      ✕
-                    </Button>
-                  </Badge>
-                ))}
-              </div>
-            )}
+            <Form.Text className="text-muted">
+              Click the days you are generally available for events.
+            </Form.Text>
           </Form.Group>
 
           <Button variant="primary" type="submit">
