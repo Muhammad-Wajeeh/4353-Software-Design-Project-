@@ -1,4 +1,3 @@
-// Client/src/Pages/VolunteerMatching.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import Sidebar from "./Sidebar";
@@ -46,24 +45,53 @@ const SKILL_FIELDS = [
   ["customerService", "Customer Service"],
 ];
 
-// normalize anything date-like to YYYY-MM-DD or null
-const toIsoDate = (val) => {
+// Map day index -> key we use in profile.availability.days
+const DAY_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
+
+// Get weekday index (0..6, Sun..Sat) in a timezone-safe way
+const weekdayOf = (val) => {
   if (!val) return null;
   const d = new Date(val);
   if (Number.isNaN(d.getTime())) return null;
-  return d.toISOString().slice(0, 10);
+  // Use UTC so we don't slip a day when converting
+  return d.getUTCDay(); // 0..6 (Sun..Sat)
 };
 
-const weekdayOf = (iso) => new Date(iso).getDay(); // 0..6 (Sun..Sat)
+/**
+ * Build a normalized "requiredSkills" array for an event.
+ *  - Prefer event.requiredSkills if present (from /events).
+ *  - Otherwise, derive from position counts (from /event/:name).
+ */
+const buildRequiredSkills = (event) => {
+  if (Array.isArray(event.requiredSkills) && event.requiredSkills.length) {
+    return event.requiredSkills;
+  }
+
+  // Derive from non-zero slots in the positions
+  const derived = SKILL_FIELDS.filter(([key]) => Number(event[key] ?? 0) > 0).map(
+    ([, label]) => label.toLowerCase()
+  );
+  return derived;
+};
 
 /**
- * Compute a 0–100 match score between an event and a volunteer profile.
+ * Core matching logic. Returns the components we show in the breakdown.
  *  - skills overlap (60%)
- *  - availability by date / weekday (25%)
+ *  - weekday availability (25%)
  *  - location proximity by city/state (15%)
+ *
+ * Returns:
+ * {
+ *   overall: 0..100,
+ *   skills: 0..100,
+ *   availability: 0..100,
+ *   location: 0..100
+ * }
  */
-function computeScore(event, profile) {
-  if (!profile) return 0;
+function explainMatch(rawEvent, profile) {
+  if (!profile) {
+    return { overall: 0, skills: 0, availability: 0, location: 0 };
+  }
 
   const weights = {
     skills: 0.6,
@@ -71,37 +99,33 @@ function computeScore(event, profile) {
     location: 0.15,
   };
 
+  // Normalize event fields to cover both /events and /event/:name
+  const eventDateStr = rawEvent.date || rawEvent.eventDate || null;
+  const eventLocationStr =
+    rawEvent.location || rawEvent.eventLocation || "" || "";
+
   // ---------- 1) SKILL MATCH ----------
-  const req = Array.isArray(event.requiredSkills) ? event.requiredSkills : [];
+  const req = buildRequiredSkills(rawEvent);
   const my = Array.isArray(profile.skills) ? profile.skills : [];
   const reqSet = new Set(req.map((s) => s.toLowerCase()));
   const mySet = new Set(my.map((s) => s.toLowerCase()));
   const overlap = [...reqSet].filter((s) => mySet.has(s)).length;
 
-  const skillScore =
-    req.length === 0 ? weights.skills : (overlap / req.length) * weights.skills;
+  const skillFrac = req.length === 0 ? 1 : overlap / req.length;
+  const skillScore = weights.skills * skillFrac; // 0..0.6
 
-  // ---------- 2) AVAILABILITY MATCH ----------
+  // ---------- 2) AVAILABILITY MATCH (by weekday flags) ----------
   let availScore = 0;
-  const eventIso = toIsoDate(event.date);
-  const dates = Array.isArray(profile.availability?.dates)
-    ? profile.availability.dates
-    : [];
+  const days = profile.availability?.days || {};
 
-  if (eventIso && dates.length > 0) {
-    const dateSet = new Set(dates);
-    const hasExactDate = dateSet.has(eventIso);
-
-    const eventDow = weekdayOf(eventIso);
-    const hasSameWeekday = dates.some((d) => {
-      const di = toIsoDate(d);
-      return di && weekdayOf(di) === eventDow;
-    });
-
-    if (hasExactDate) {
-      availScore = weights.availability;
-    } else if (hasSameWeekday) {
-      availScore = weights.availability * 0.5;
+  if (eventDateStr) {
+    const dow = weekdayOf(eventDateStr); // 0..6 (Sun..Sat)
+    if (dow != null) {
+      const dayKey = DAY_KEYS[dow];
+      if (dayKey && days[dayKey]) {
+        // volunteer is generally available on this weekday
+        availScore = weights.availability; // full 0.25
+      }
     }
   }
 
@@ -109,10 +133,9 @@ function computeScore(event, profile) {
   const profileCity = (profile.city || "").trim().toLowerCase();
   const profileState = (profile.state || "").trim().toLowerCase();
 
-  const locStr = typeof event.location === "string" ? event.location : "";
-  const [locCityRaw, locStateRaw] = locStr.split(",");
-  const eventCity = (event.city || locCityRaw || "").trim().toLowerCase();
-  const eventState = (event.state || locStateRaw || "").trim().toLowerCase();
+  const [locCityRaw, locStateRaw] = eventLocationStr.split(",");
+  const eventCity = (rawEvent.city || locCityRaw || "").trim().toLowerCase();
+  const eventState = (rawEvent.state || locStateRaw || "").trim().toLowerCase();
 
   let locScore = 0;
   if (profileCity && eventCity && profileCity === eventCity) {
@@ -122,7 +145,21 @@ function computeScore(event, profile) {
   }
 
   const total = (skillScore + availScore + locScore) * 100;
-  return Math.round(Math.min(100, total));
+
+  return {
+    overall: Math.round(Math.min(100, total)),
+    skills: Math.round(skillScore * 100),
+    availability: Math.round(availScore * 100),
+    location: Math.round(locScore * 100),
+  };
+}
+
+/**
+ * Compute a single 0–100 score for the event (used on the cards).
+ * Just returns explainMatch().overall so it's always in sync with the breakdown.
+ */
+function computeScore(event, profile) {
+  return explainMatch(event, profile).overall;
 }
 
 export default function VolunteerMatching() {
@@ -141,7 +178,7 @@ export default function VolunteerMatching() {
   const [detailsEvent, setDetailsEvent] = useState(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
 
-  // Signup modal (new)
+  // Signup modal
   const [signupEvent, setSignupEvent] = useState(null);
   const [signupSkill, setSignupSkill] = useState("");
   const [signupLoading, setSignupLoading] = useState(false);
@@ -409,9 +446,7 @@ export default function VolunteerMatching() {
       const total = Number(signupEvent[key] ?? 0);
       const filled =
         Number(
-          signupEvent[key + "Filled"] ??
-            signupEvent[key + "filled"] ??
-            0
+          signupEvent[key + "Filled"] ?? signupEvent[key + "filled"] ?? 0
         ) || 0;
 
       if (!total) return null;
@@ -468,6 +503,10 @@ export default function VolunteerMatching() {
       </>
     );
   }
+
+  // precompute breakdown for the details modal
+  const matchForDetails =
+    detailsEvent && profile ? explainMatch(detailsEvent, profile) : null;
 
   return (
     <>
@@ -615,6 +654,24 @@ export default function VolunteerMatching() {
                   "No description provided."}
               </p>
               <hr />
+
+              {matchForDetails && (
+                <>
+                  <h6>Match breakdown</h6>
+                  <p className="mb-1">
+                    Overall match score {matchForDetails.overall} / 100
+                  </p>
+                  <ul className="mb-3">
+                    <li>Skills match: {matchForDetails.skills} / 100</li>
+                    <li>
+                      Availability match: {matchForDetails.availability} / 100
+                    </li>
+                    <li>Location match: {matchForDetails.location} / 100</li>
+                  </ul>
+                  <hr />
+                </>
+              )}
+
               <h6>Positions &amp; Slots</h6>
               {renderPositions()}
             </>
