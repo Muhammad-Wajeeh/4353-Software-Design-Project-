@@ -156,18 +156,15 @@ export default function Reports() {
   }, [activeTab, selectedMyEventId, token]);
 
   const downloadCsv = async (kind) => {
-    if (!token) {
-      alert("You must be logged in to download reports.");
-      return;
-    }
+  if (!token) {
+    alert("You must be logged in to download reports.");
+    return;
+  }
 
-    if (kind !== "volunteers" && kind !== "events") {
-      alert("CSV export is currently available only for global reports.");
-      return;
-    }
+  const headers = { Authorization: `Bearer ${token}` };
 
-    const headers = { Authorization: `Bearer ${token}` };
-
+  // ---------- GLOBAL: volunteers / events (use backend endpoints) ----------
+  if (kind === "volunteers" || kind === "events") {
     const url =
       kind === "volunteers"
         ? `${API_BASE}/reports/volunteers.csv`
@@ -194,66 +191,196 @@ export default function Reports() {
       console.error("Failed to download CSV", err);
       alert("Could not download CSV report.");
     }
-  };
+    return;
+  }
+
+  // ---------- MY EVENTS: build CSV on the client ----------
+  if (!selectedMyEventId || !selectedEventMeta) {
+    alert("Please select one of your events first.");
+    return;
+  }
+
+  let header = [];
+  let rows = [];
+  let filename = "";
+
+  if (kind === "my-volunteers") {
+    header = [
+      "Volunteer",
+      "Username",
+      "Email",
+      "Hours (this event)",
+      "Status (this event)",
+      "Total events",
+      "Total hours",
+    ];
+    rows = myEventVolunteers.map((v) => [
+      v.fullname || "",
+      v.username || "",
+      v.email || "",
+      v.hours_this_event ?? "",
+      v.status_this_event || "",
+      v.total_events || 0,
+      v.total_hours || 0,
+    ]);
+    filename = `my_event_volunteers_${selectedMyEventId}.csv`;
+  } else if (kind === "my-assignments") {
+    header = [
+      "Role",
+      "Volunteer",
+      "Username",
+      "Email",
+      "Hours",
+      "Status",
+    ];
+    rows = myEventAssignments.map((a) => [
+      skillLabel(a.skill),
+      a.fullname || "",
+      a.username || "",
+      a.email || "",
+      a.hours ?? "",
+      a.status || "",
+    ]);
+    filename = `my_event_assignments_${selectedMyEventId}.csv`;
+  } else {
+    return;
+  }
+
+  const lines = [
+    header.join(","),
+    ...rows.map((r) =>
+      r
+        .map((cell) =>
+          cell === null || cell === undefined
+            ? ""
+            : JSON.stringify(String(cell))
+        )
+        .join(",")
+    ),
+  ];
+
+  const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+};
+
 
   // -------- PDF generation (client-side, global only for now) --------
   const downloadPdf = () => {
-    if (activeTab !== "volunteers" && activeTab !== "events") {
-      alert("PDF export is currently available only for global reports.");
+  if (!token) {
+    alert("You must be logged in to download reports.");
+    return;
+  }
+
+  const doc = new jsPDF({
+    orientation: "portrait",
+    unit: "pt",
+    format: "a4",
+  });
+
+  const marginLeft = 40;
+  let title = "";
+  let head = [];
+  let body = [];
+
+  // ---------- GLOBAL TABS ----------
+  if (activeTab === "volunteers") {
+    title = "Volunteer Participation Report";
+    head = [["ID", "Volunteer", "Username", "Email", "Events attended"]];
+    body = volunteers.map((v) => [
+      v.id,
+      v.fullname || "—",
+      v.username || "—",
+      v.email || "—",
+      v.events_attended || 0,
+    ]);
+  } else if (activeTab === "events") {
+    title = "Event Assignments Report";
+    head = [["ID", "Event", "Date", "Location", "Description", "Volunteers"]];
+    body = events.map((e) => [
+      e.id,
+      e.name || "—",
+      fmtDate(e.date),
+      e.location || "—",
+      (e.description || "").slice(0, 60),
+      e.volunteers_assigned || 0,
+    ]);
+  }
+
+  // ---------- MY EVENTS TABS ----------
+  else if (activeTab === "my-volunteers") {
+    if (!selectedMyEventId || !selectedEventMeta) {
+      alert("Please select one of your events first.");
       return;
     }
-
-    const doc = new jsPDF({
-      orientation: "portrait",
-      unit: "pt",
-      format: "a4",
-    });
-
-    const marginLeft = 40;
-    let title = "";
-    let head = [];
-    let body = [];
-
-    if (activeTab === "volunteers") {
-      title = "Volunteer Participation Report";
-      head = [["ID", "Volunteer", "Username", "Email", "Events attended"]];
-      body = volunteers.map((v) => [
-        v.id,
-        v.fullname || "—",
-        v.username || "—",
-        v.email || "—",
-        v.events_attended || 0,
-      ]);
-    } else {
-      title = "Event Assignments Report";
-      head = [["ID", "Event", "Date", "Location", "Description", "Volunteers"]];
-      body = events.map((e) => [
-        e.id,
-        e.name || "—",
-        fmtDate(e.date),
-        e.location || "—",
-        (e.description || "").slice(0, 60),
-        e.volunteers_assigned || 0,
-      ]);
+    title = `Volunteers – ${selectedEventMeta.name || "My Event"}`;
+    head = [
+      [
+        "Volunteer",
+        "Username",
+        "Email",
+        "Hours (this event)",
+        "Status (this event)",
+        "Total events",
+        "Total hours",
+      ],
+    ];
+    body = myEventVolunteers.map((v) => [
+      v.fullname || "—",
+      v.username || "—",
+      v.email || "—",
+      v.hours_this_event ?? "—",
+      v.status_this_event || "—",
+      v.total_events || 0,
+      v.total_hours || 0,
+    ]);
+  } else if (activeTab === "my-assignments") {
+    if (!selectedMyEventId || !selectedEventMeta) {
+      alert("Please select one of your events first.");
+      return;
     }
+    title = `Assignments – ${selectedEventMeta.name || "My Event"}`;
+    head = [["Role", "Volunteer", "Username", "Email", "Hours", "Status"]];
+    body = myEventAssignments.map((a) => [
+      skillLabel(a.skill),
+      a.fullname || "—",
+      a.username || "—",
+      a.email || "—",
+      a.hours ?? "—",
+      a.status || "—",
+    ]);
+  } else {
+    return;
+  }
 
-    doc.setFontSize(16);
-    doc.text(title, marginLeft, 40);
+  doc.setFontSize(16);
+  doc.text(title, marginLeft, 40);
 
-    autoTable(doc, {
-      startY: 60,
-      head,
-      body,
-      styles: { fontSize: 10 },
-      headStyles: { fillColor: [41, 128, 185] },
-    });
+  autoTable(doc, {
+    startY: 60,
+    head,
+    body,
+    styles: { fontSize: 10 },
+    headStyles: { fillColor: [41, 128, 185] },
+  });
 
-    const filename =
-      activeTab === "volunteers"
-        ? "volunteers_report.pdf"
-        : "events_report.pdf";
-    doc.save(filename);
-  };
+  const filenameBase =
+    activeTab === "volunteers"
+      ? "volunteers_report"
+      : activeTab === "events"
+      ? "events_report"
+      : activeTab === "my-volunteers"
+      ? `my_event_volunteers_${selectedMyEventId}`
+      : `my_event_assignments_${selectedMyEventId}`;
+
+  doc.save(`${filenameBase}.pdf`);
+};
 
   // ----------------- GLOBAL TABLES -----------------
 
@@ -663,7 +790,7 @@ export default function Reports() {
     return null;
   };
 
-  const isGlobalTab = activeTab === "volunteers" || activeTab === "events";
+  // const isGlobalTab = activeTab === "volunteers" || activeTab === "events";
 
   return (
     <>
@@ -732,7 +859,6 @@ export default function Reports() {
               variant="outline-primary"
               size="sm"
               onClick={() => downloadCsv(activeTab)}
-              disabled={!isGlobalTab}
             >
               Download CSV
             </Button>
@@ -740,7 +866,6 @@ export default function Reports() {
               variant="outline-secondary"
               size="sm"
               onClick={downloadPdf}
-              disabled={!isGlobalTab}
             >
               Download PDF
             </Button>
