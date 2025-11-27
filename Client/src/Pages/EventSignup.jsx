@@ -91,6 +91,10 @@ function EventSignup() {
             Select a Position for {event.eventName}
           </Card.Title>
 
+          <Card.Subtitle className="text-muted text-center mb-2">
+            Duration: {event.hours ? `${event.hours} hours` : "Not provided"}
+          </Card.Subtitle>
+
           <Card.Subtitle className="text-muted text-center mb-4">
             {event.eventLocation} — {(event.eventDate || "").split("T")[0]}
           </Card.Subtitle>

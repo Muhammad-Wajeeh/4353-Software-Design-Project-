@@ -135,9 +135,23 @@ function VolunteerHistory() {
 
   if (loading) return <p>Loading...</p>;
 
+  // --- NEW: total hours volunteered (sum of event.hours) ---
+  const totalHours = history.reduce(
+    (sum, ev) => sum + (Number(ev.hours) || 0),
+    0
+  );
+
   return (
     <>
       <Sidebar />
+
+      {/* Total hours summary */}
+      <div className="d-flex justify-content-center mt-4 mb-3">
+        <h4 className="fw-bold">
+          Total Hours Volunteered:{" "}
+          <span className="text-primary">{totalHours}</span>
+        </h4>
+      </div>
 
       <Table hover>
         <thead>
@@ -152,7 +166,10 @@ function VolunteerHistory() {
           {history.map((event, idx) => (
             <tr key={event.id ?? `${event.name}-${idx}`}>
               <td>{event.name || event.eventName}</td>
-              <td>{(event.date || event.eventDate || "").split("T")[0] || "No Date"}</td>
+              <td>
+                {(event.date || event.eventDate || "").split("T")[0] ||
+                  "No Date"}
+              </td>
               <td>{event.organization || "Unknown"}</td>
               <td>
                 <Button
@@ -214,6 +231,15 @@ function VolunteerHistory() {
                     selectedEvent.time
                 )}
               </p>
+              <p>
+                <strong>Duration:</strong>{" "}
+                {selectedEvent.hours
+                  ? `${selectedEvent.hours} hour${
+                      selectedEvent.hours === 1 ? "" : "s"
+                    }`
+                  : "Not specified"}
+              </p>
+
               {selectedEvent.description || selectedEvent.eventDescription ? (
                 <>
                   <hr />

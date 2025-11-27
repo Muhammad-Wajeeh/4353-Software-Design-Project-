@@ -19,6 +19,7 @@ function EditEvent() {
 
   const [eventID, setEventID] = useState();
   const [event, setEvent] = useState(null);
+  const [eventHours, setEventHours] = useState(""); // 👈 NEW
   const [skillNeeds, setSkillNeeds] = useState({
     firstAid: 0,
     foodService: 0,
@@ -38,15 +39,15 @@ function EditEvent() {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            // backend expects these names:
             eventName: event.eventName,
             eventDescription: event.eventDescription,
             eventLocation: event.eventLocation,
-            eventZipcode: event.eventZipCode, // lowercase "c" on backend
+            eventZipcode: event.eventZipCode,
             eventUrgency: event.eventUrgency,
             eventDate: event.eventDate,
-            eventTime: event.eventTime, // "HH:MM" string
+            eventTime: event.eventTime,
             organization: event.organization,
+            hours: eventHours ? Number(eventHours) : null, // 👈 SEND HOURS
             skillNeeds: skillNeeds,
           }),
         }
@@ -84,10 +85,11 @@ function EditEvent() {
         eventZipCode: data.eventZipCode,
         eventUrgency: urgencyMap[data.eventUrgency],
         eventDate: new Date(data.eventDate).toISOString().split("T")[0],
-        // convert DB time "13:47:00" → "13:47" for <input type="time">
         eventTime: dbTimeToInput(data.eventTime),
         organization: data.organization || "",
       });
+
+      setEventHours(data.hours ?? "");             // 👈 LOAD EVENT HOURS
 
       setSkillNeeds({
         firstAid: data.firstAid,
@@ -107,7 +109,6 @@ function EditEvent() {
 
   useEffect(() => {
     fetchEvent();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventName]);
 
   if (!event) return <p>Loading...</p>;
@@ -120,47 +121,30 @@ function EditEvent() {
           <Form.Label style={{ fontWeight: "bold" }}>Event Name</Form.Label>
           <Form.Control
             type="text"
-            placeholder="Enter event name"
             maxLength={100}
             required
-            name="eventName"
-            value={event.eventName}
             readOnly
-            onChange={(e) =>
-              setEvent((prev) => ({ ...prev, eventName: e.target.value }))
-            }
+            value={event.eventName}
           />
-          <Form.Text muted>Maximum 100 characters.</Form.Text>
         </Form.Group>
 
-        <Form.Group className="mb-3" controlId="emDescription">
-          <Form.Label style={{ fontWeight: "bold" }}>
-            Event Description
-          </Form.Label>
+        <Form.Group className="mb-3">
+          <Form.Label style={{ fontWeight: "bold" }}>Event Description</Form.Label>
           <Form.Control
             as="textarea"
             rows={5}
-            placeholder="Describe the event..."
-            required
-            name="description"
             value={event.eventDescription}
             onChange={(e) =>
-              setEvent((prev) => ({
-                ...prev,
-                eventDescription: e.target.value,
-              }))
+              setEvent((prev) => ({ ...prev, eventDescription: e.target.value }))
             }
           />
         </Form.Group>
 
-        <Form.Group className="mb-3" controlId="emLocation">
+        <Form.Group className="mb-3">
           <Form.Label style={{ fontWeight: "bold" }}>Location</Form.Label>
           <Form.Control
             as="textarea"
             rows={2}
-            placeholder="Enter location (address or venue)"
-            required
-            name="location"
             value={event.eventLocation}
             onChange={(e) =>
               setEvent((prev) => ({ ...prev, eventLocation: e.target.value }))
@@ -168,12 +152,9 @@ function EditEvent() {
           />
         </Form.Group>
 
-        <Form.Group className="mb-3" controlId="emOrganization">
+        <Form.Group className="mb-3">
           <Form.Label style={{ fontWeight: "bold" }}>Organization</Form.Label>
           <Form.Control
-            type="text"
-            placeholder="Enter organization name"
-            name="organization"
             value={event.organization}
             onChange={(e) =>
               setEvent((prev) => ({ ...prev, organization: e.target.value }))
@@ -181,13 +162,10 @@ function EditEvent() {
           />
         </Form.Group>
 
-        <Form.Group className="mb-3" controlId="emZipCode">
+        <Form.Group className="mb-3">
           <Form.Label style={{ fontWeight: "bold" }}>Zip Code</Form.Label>
           <Form.Control
             type="number"
-            placeholder="Enter Zip/Postal Code"
-            required
-            name="zip"
             value={event.eventZipCode}
             onChange={(e) =>
               setEvent((prev) => ({ ...prev, eventZipCode: e.target.value }))
@@ -195,10 +173,23 @@ function EditEvent() {
           />
         </Form.Group>
 
-        <Form.Group className="mb-3" controlId="emRequiredSkills">
-          <Form.Label className="fw-bold" style={{ fontWeight: "bold" }}>
-            Number Of People Required For Each Skill
-          </Form.Label>
+        {/* NEW FIELD: EVENT DURATION */}
+        <Form.Group className="mb-3">
+          <Form.Label style={{ fontWeight: "bold" }}>Event Duration (hours)</Form.Label>
+          <Form.Control
+            type="number"
+            min="1"
+            step="0.5"
+            value={eventHours}
+            onChange={(e) => setEventHours(e.target.value)}
+          />
+          <Form.Text muted>
+            Volunteers will be credited these hours when signing up.
+          </Form.Text>
+        </Form.Group>
+
+        <Form.Group className="mb-3">
+          <Form.Label>Required Skills</Form.Label>
 
           {[
             ["firstAid", "First Aid"],
@@ -209,7 +200,7 @@ function EditEvent() {
             ["dataEntry", "Data Entry"],
             ["customerService", "Customer Service"],
           ].map(([key, label]) => (
-            <div key={key} className="d-flex flex-column mb-2">
+            <div key={key} className="mb-2">
               <Form.Label>{label}</Form.Label>
               <Form.Control
                 type="number"
@@ -225,17 +216,14 @@ function EditEvent() {
           ))}
         </Form.Group>
 
-        <Form.Group className="mb-3" controlId="emUrgency">
+        <Form.Group className="mb-3">
           <Form.Label style={{ fontWeight: "bold" }}>Urgency</Form.Label>
           <Form.Select
-            required
-            name="urgency"
             value={event.eventUrgency}
             onChange={(e) =>
               setEvent((prev) => ({ ...prev, eventUrgency: e.target.value }))
             }
           >
-            <option value="">Select urgency...</option>
             <option value="Low">Low</option>
             <option value="Medium">Medium</option>
             <option value="High">High</option>
@@ -243,12 +231,10 @@ function EditEvent() {
           </Form.Select>
         </Form.Group>
 
-        <Form.Group className="mb-3" controlId="emEventDate">
+        <Form.Group className="mb-3">
           <Form.Label style={{ fontWeight: "bold" }}>Event Date</Form.Label>
           <Form.Control
             type="date"
-            required
-            name="eventDate"
             value={event.eventDate}
             onChange={(e) =>
               setEvent((prev) => ({ ...prev, eventDate: e.target.value }))
@@ -256,12 +242,11 @@ function EditEvent() {
           />
         </Form.Group>
 
-        <Form.Group className="mb-3" controlId="emEventTime">
+        <Form.Group className="mb-3">
           <Form.Label style={{ fontWeight: "bold" }}>Event Time</Form.Label>
           <Form.Control
             type="time"
-            name="eventTime"
-            value={event.eventTime || ""}
+            value={event.eventTime}
             onChange={(e) =>
               setEvent((prev) => ({ ...prev, eventTime: e.target.value }))
             }

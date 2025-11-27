@@ -113,7 +113,8 @@ router.post("/create", authenticateToken, async (req, res) => {
       eventUrgency,
       eventDate,
       eventTime,
-      organization, // NEW
+      organization, // optional
+      hours,        // 👈 NEW: duration in hours from client
     } = req.body || {};
 
     const {
@@ -141,10 +142,10 @@ router.post("/create", authenticateToken, async (req, res) => {
     await pool.query(
       `INSERT INTO events (
         name, description, location, zipcode, urgency, date,
-        creatorid, organization, event_time,
+        creatorid, organization, event_time, hours,
         firstaid, foodservice, logistics, teaching, eventsetup, dataentry, customerservice
       )
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
       [
         eventName,
         eventDescription,
@@ -155,6 +156,7 @@ router.post("/create", authenticateToken, async (req, res) => {
         req.user.id,
         organization || req.user.username, // use provided or fallback to username
         eventTime,
+        hours ?? null,            // 👈 store event duration (may be null)
         firstAid,
         foodService,
         logistics,
@@ -439,15 +441,21 @@ router.put("/signup/:eventName", authenticateToken, async (req, res) => {
       });
     }
 
+    // 👇 NEW: use event duration as planned volunteer hours
+    const eventDurationHours = ev.hours != null ? Number(ev.hours) : 0;
+
     const attendance = await pool.query(
       `
-      INSERT INTO attendance (memberid, eventid, willattend, hasattended, skill)
-      VALUES ($1, $2, true, false, $3)
+      INSERT INTO attendance (memberid, eventid, willattend, hasattended, skill, hoursvolunteered)
+      VALUES ($1, $2, true, false, $3, $4)
       ON CONFLICT (memberid, eventid)
-      DO UPDATE SET willattend = true, skill = EXCLUDED.skill
+      DO UPDATE SET
+        willattend       = true,
+        skill            = EXCLUDED.skill,
+        hoursvolunteered = EXCLUDED.hoursvolunteered
       RETURNING *;
       `,
-      [userId, ev.id, skill]
+      [userId, ev.id, skill, eventDurationHours]
     );
 
     await pool.query(
@@ -506,7 +514,8 @@ router.put("/cancelSignUp/:eventName", authenticateToken, async (req, res) => {
       UPDATE attendance
       SET willattend = false,
           hasattended = false,
-          skill = NULL
+          skill = NULL,
+          hoursvolunteered = 0      -- 👈 clear planned hours when cancelling
       WHERE memberid = $1 AND eventid = $2
       RETURNING *
       `,

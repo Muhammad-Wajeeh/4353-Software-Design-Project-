@@ -69,8 +69,19 @@ export default function EventDetails() {
             <div className="mt-3">
               <div><strong>Date:</strong> {fmtDate(event.date)}</div>
               <div><strong>Location:</strong> {event.location}</div>
+              <div>
+                <strong>Duration:</strong>{" "}
+                {event.hours
+                  ? `${event.hours} hour${event.hours === 1 ? "" : "s"}`
+                  : "Not specified"}
+              </div>
               <div><strong>Capacity:</strong> {event.capacity}</div>
-              <div className="mt-2"><strong>Required skills:</strong> {Array.isArray(event.requiredSkills) && event.requiredSkills.length ? event.requiredSkills.join(", ") : "None"}</div>
+              <div className="mt-2">
+                <strong>Required skills:</strong>{" "}
+                {Array.isArray(event.requiredSkills) && event.requiredSkills.length
+                  ? event.requiredSkills.join(", ")
+                  : "None"}
+              </div>
               <div className="mt-3"><strong>Description:</strong><br />{event.description}</div>
             </div>
 

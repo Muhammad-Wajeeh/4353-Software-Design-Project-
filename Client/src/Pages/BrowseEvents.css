@@ -1,14 +1,18 @@
+/* Container: grid that adapts to screen width */
 .events-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   gap: 1.5rem;
   margin-top: 2rem;
+  padding: 0 1rem;
+  box-sizing: border-box;
 }
 
-/* make each card wider */
+/* Card: fill its grid cell, no fixed width/centering */
 .event-card {
-  width: 70rem; /* increased from 22rem → wider */
+  width: 100%;
+  max-width: none;        /* 🔹 allow it to grow with the column */
+  margin: 0;              /* 🔹 no auto-centering */
   position: relative;
   border-radius: 12px;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
@@ -16,10 +20,11 @@
 }
 
 .event-card:hover {
-  transform: scale(1.02);
+  transform: translateY(-2px);
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
 }
 
+/* keep all your existing styles below this the same */
 .event-card .card-header {
   background-color: #ffffff;
   font-weight: 600;
@@ -51,23 +56,11 @@
   color: white;
 }
 
-/* Color variants */
-.urgency-low {
-  background-color: #198754; /* green */
-}
-
-.urgency-medium {
-  background-color: #fac936; /* yellow */
-  color: #212529;
-}
-
-.urgency-high {
-  background-color: #dd7520; /* organge */
-}
-
-.urgency-critical {
-  background-color: #ff0000; /* red */
-}
+/* Colors */
+.urgency-low { background-color: #198754; }
+.urgency-medium { background-color: #fac936; color: #212529; }
+.urgency-high { background-color: #dd7520; }
+.urgency-critical { background-color: #ff0000; }
 
 /* Skill tags */
 .skill-badge {
@@ -98,7 +91,7 @@
   gap: 6px;
 }
 
-/* 🔹 Attendance badge (top-left) */
+/* Attendance badge (top-left) */
 .attendance-badge {
   position: absolute;
   top: 8px;
@@ -111,9 +104,81 @@
 }
 
 .attendance-badge.attending {
-  background-color: #28a745; /* green */
+  background-color: #28a745;
 }
 
 .attendance-badge.not-attending {
-  background-color: #6c757d; /* gray */
+  background-color: #6c757d;
+}
+
+/* ------------------------------------------------------ */
+/* 📱 RESPONSIVE BREAKPOINTS – only adjust layout/fonts, 
+   NOT card width so grid can do its job */
+/* ------------------------------------------------------ */
+
+/* Medium screens — laptops, smaller desktops */
+@media (max-width: 1200px) {
+  .bottom-row {
+    gap: 10px;
+  }
+}
+
+/* Tablets */
+@media (max-width: 992px) {
+  .bottom-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .text-end {
+    text-align: left;
+  }
+}
+
+/* Small tablets / Large phones */
+@media (max-width: 768px) {
+  .events-container {
+    grid-template-columns: 1fr; /* single column */
+  }
+
+  .urgency-badge,
+  .attendance-badge {
+    font-size: 0.75rem;
+    padding: 4px 8px;
+  }
+
+  .event-card .card-header {
+    font-size: 1rem;
+  }
+
+  .skill-badge {
+    font-size: 0.75rem;
+  }
+}
+
+/* Mobile phones */
+@media (max-width: 576px) {
+  .events-container {
+    padding: 0 0.5rem;
+  }
+
+  .bottom-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .skills-container {
+    gap: 4px;
+  }
+
+  .skill-badge {
+    padding: 3px 8px;
+  }
+
+  .urgency-badge,
+  .attendance-badge {
+    font-size: 0.7rem;
+    padding: 3px 7px;
+  }
 }

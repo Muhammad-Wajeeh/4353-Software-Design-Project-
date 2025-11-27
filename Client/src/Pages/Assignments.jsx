@@ -247,6 +247,14 @@ function Assignments() {
                 <strong>Time:</strong>{" "}
                 {fmtTime(detailsEvent.eventTime || detailsEvent.event_time)}
               </p>
+              <p>
+                <strong>Duration:</strong>{" "}
+                {detailsEvent.hours
+                  ? `${detailsEvent.hours} hour${
+                      detailsEvent.hours === 1 ? "" : "s"
+                    }`
+                  : "Not specified"}
+              </p>
               <hr />
               <p>
                 <strong>Description:</strong>{" "}
@@ -254,6 +262,7 @@ function Assignments() {
                   detailsEvent.description ||
                   "No description provided."}
               </p>
+
               <hr />
               <h6>Positions &amp; Slots</h6>
               {renderPositions()}

@@ -17,6 +17,7 @@ function EventManagement(props) {
   const [localEventsList, setLocalEventsList] = useState([]);
   const [localEventTime, setLocalEventTime] = useState("");
   const [localEventOrganization, setLocalEventOrganization] = useState("");
+  const [localEventHours, setLocalEventHours] = useState(""); // 👈 NEW: duration in hours
 
   const [skillNeeds, setSkillNeeds] = useState({
     firstAid: 0,
@@ -63,6 +64,9 @@ function EventManagement(props) {
   const setEventOrganization =
     props.setEventOrganization ?? setLocalEventOrganization;
 
+  const eventHours = props.eventHours ?? localEventHours;              // 👈 NEW
+  const setEventHours = props.setEventHours ?? setLocalEventHours;     // 👈 NEW
+
   const navigate = useNavigate();
 
   const onSubmitForm = async (e) => {
@@ -78,6 +82,7 @@ function EventManagement(props) {
         eventDate,
         eventTime,
         organization: eventOrganization,
+        hours: eventHours ? Number(eventHours) : null, // 👈 send duration
       };
 
       const response = await fetch("http://localhost:5000/event/create", {
@@ -113,6 +118,7 @@ function EventManagement(props) {
       setEventDate("");
       setEventTime("");
       setEventOrganization("");
+      setEventHours(""); // 👈 clear
       alert("Event created!");
     } catch (err) {
       console.error(err);
@@ -248,6 +254,26 @@ function EventManagement(props) {
             />
           </Form.Group>
 
+          {/* NEW: Event Duration */}
+          <Form.Group className="mb-3" controlId="emEventHours">
+            <Form.Label style={{ paddingBottom: "5px", fontWeight: "bold" }}>
+              Event Duration (hours)
+            </Form.Label>
+            <Form.Control
+              type="number"
+              min="1"
+              step="0.5"
+              placeholder="e.g., 3"
+              name="hours"
+              value={eventHours}
+              onChange={(e) => setEventHours(e.target.value)}
+            />
+            <Form.Text muted>
+              Volunteers who sign up are expected to work the full event
+              duration.
+            </Form.Text>
+          </Form.Group>
+
           <Form.Group className="mb-3" controlId="emRequiredSkills">
             <Form.Label>Number Of People Required For Each Skill</Form.Label>
 
@@ -344,9 +370,16 @@ function EventManagement(props) {
                     .split("T")[0] || "No Date"}
                 </Card.Subtitle>
 
-                <Card.Subtitle className="mb-2 text-muted">
+                <Card.Subtitle className="mb-1 text-muted">
                   {event.eventTime || event.event_time || "TBD"}
                 </Card.Subtitle>
+
+                {/* Show duration if present */}
+                {event.hours != null && (
+                  <Card.Subtitle className="mb-2 text-muted">
+                    Duration: {event.hours} hour{event.hours === 1 ? "" : "s"}
+                  </Card.Subtitle>
+                )}
 
                 <Card.Text>
                   {event.eventDescription || event.description}

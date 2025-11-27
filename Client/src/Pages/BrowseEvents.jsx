@@ -16,6 +16,8 @@ const SKILL_FIELDS = [
   ["customerservice", "Customer Service"],
 ];
 
+
+
 // Helper: format DB time ("13:47:00") as US 12-hour time ("1:47 PM")
 const fmtTime = (t) => {
   if (!t) return "TBD";
@@ -320,6 +322,14 @@ function BrowseEvents() {
               <p>
                 <strong>Time:</strong>{" "}
                 {fmtTime(selectedEvent.eventTime || selectedEvent.time)}
+              </p>
+              <p>
+                <strong>Duration:</strong>{" "}
+                {selectedEvent.hours
+                  ? `${selectedEvent.hours} hour${
+                      selectedEvent.hours === 1 ? "" : "s"
+                    }`
+                  : "Not specified"}
               </p>
               <hr />
               <p>
