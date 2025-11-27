@@ -1,11 +1,78 @@
+// Server/routes/eventRoutes.js
 const express = require("express");
 const router = express.Router();
 const pool = require("../DB");
 const authenticateToken = require("./authenticator");
 
-router.get("/", (req, res) => {
-  res.status(200).json({ events });
+/**
+ * GET /events
+ * Used by Volunteer Matching – returns FUTURE events with a normalized
+ * shape and a requiredSkills array derived from the skill columns.
+ */
+router.get("/", async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT 
+        id,
+        name,
+        description,
+        location,
+        zipcode,
+        urgency,
+        date,
+        organization,
+        hours,
+        event_time,
+        firstaid,
+        foodservice,
+        logistics,
+        teaching,
+        eventsetup,
+        dataentry,
+        customerservice
+      FROM events
+      WHERE (date + event_time) > NOW()
+      ORDER BY date ASC, event_time ASC
+    `);
+
+    const events = result.rows.map((ev) => {
+      const requiredSkills = [];
+      if (ev.firstaid > 0) requiredSkills.push("first aid");
+      if (ev.foodservice > 0) requiredSkills.push("food service");
+      if (ev.logistics > 0) requiredSkills.push("logistics");
+      if (ev.teaching > 0) requiredSkills.push("teaching");
+      if (ev.eventsetup > 0) requiredSkills.push("event setup");
+      if (ev.dataentry > 0) requiredSkills.push("data entry");
+      if (ev.customerservice > 0) requiredSkills.push("customer service");
+
+      return {
+        id: String(ev.id),
+        name: ev.name,
+        description: ev.description,
+        location: ev.location,
+        zipcode: ev.zipcode,
+        urgency: ev.urgency,
+        date: ev.date,
+        organization: ev.organization,
+        hours: ev.hours,
+        time: ev.event_time,
+        requiredSkills,
+        status: "Open",
+      };
+    });
+
+    return res.status(200).json({ events });
+  } catch (err) {
+    console.error("Error fetching events for matching:", err.message);
+    return res
+      .status(500)
+      .json({ error: "Server error while fetching events" });
+  }
 });
+
+// ------------------------------------------------------------------
+// Legacy / admin endpoints (kept for other pages)
+// ------------------------------------------------------------------
 
 router.get("/getall", async (req, res) => {
   try {
@@ -46,6 +113,7 @@ router.post("/create", authenticateToken, async (req, res) => {
       eventUrgency,
       eventDate,
       eventTime,
+      organization, // NEW
     } = req.body || {};
 
     const {
@@ -56,25 +124,27 @@ router.post("/create", authenticateToken, async (req, res) => {
       eventSetup,
       dataEntry,
       customerService,
-    } = skillNeeds;
+    } = skillNeeds || {};
 
-    // Basic validation
     if (!eventName || !eventDate) {
       return res
         .status(400)
         .json({ message: "eventName and eventDate are required" });
     }
 
-    var eventUrgencyNumberForm = 0;
+    let eventUrgencyNumberForm = 0;
+    if (eventUrgency === "Critical") eventUrgencyNumberForm = 3;
+    else if (eventUrgency === "High") eventUrgencyNumberForm = 2;
+    else if (eventUrgency === "Medium") eventUrgencyNumberForm = 1;
+    else if (eventUrgency === "Low") eventUrgencyNumberForm = 0;
 
-    if (eventUrgency == "Critical") eventUrgencyNumberForm = 3;
-    else if (eventUrgency == "High") eventUrgencyNumberForm = 2;
-    else if (eventUrgency == "Medium") eventUrgencyNumberForm = 1;
-    else if (eventUrgency == "Low") eventUrgencyNumberForm = 0;
-
-    const queryResult = await pool.query(
-      `INSERT INTO events (name, description, location, zipcode, urgency, date, creatorid, organization, event_time, firstaid, foodservice, logistics, teaching, eventsetup, dataentry, customerservice )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
+    await pool.query(
+      `INSERT INTO events (
+        name, description, location, zipcode, urgency, date,
+        creatorid, organization, event_time,
+        firstaid, foodservice, logistics, teaching, eventsetup, dataentry, customerservice
+      )
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
       [
         eventName,
         eventDescription,
@@ -83,7 +153,7 @@ router.post("/create", authenticateToken, async (req, res) => {
         eventUrgencyNumberForm,
         eventDate,
         req.user.id,
-        req.user.username,
+        organization || req.user.username, // use provided or fallback to username
         eventTime,
         firstAid,
         foodService,
@@ -94,28 +164,27 @@ router.post("/create", authenticateToken, async (req, res) => {
         customerService,
       ]
     );
+
+    return res.status(201).json("Event Created");
   } catch (err) {
-    postgresqlUniqueViolationErrorCode = "23505";
-    if (err.code == postgresqlUniqueViolationErrorCode)
-      res.status(400).json({ error: "Event name already exists" });
+    const postgresqlUniqueViolationErrorCode = "23505";
+    if (err.code === postgresqlUniqueViolationErrorCode) {
+      return res.status(400).json({ error: "Event name already exists" });
+    }
 
-    res.status(500);
-    console.log(err);
+    console.error("Error creating event:", err);
+    return res.status(500).json({ error: "Server error while creating event" });
   }
-
-  return res.status(201).json("Event Created");
 });
 
 router.delete("/delete", async (req, res) => {
   try {
     const { eventName } = req.body;
 
-    // Validation
     if (!eventName) {
       return res.status(400).json({ error: "eventName is required" });
     }
 
-    // Check if event exists
     const existingEvent = await pool.query(
       "SELECT * FROM events WHERE name = $1",
       [eventName]
@@ -125,12 +194,11 @@ router.delete("/delete", async (req, res) => {
       return res.status(404).json({ error: "Event not found" });
     }
 
-    // Delete the event
     await pool.query("DELETE FROM events WHERE name = $1", [eventName]);
 
-    return res.status(200).json({
-      message: `Event '${eventName}' deleted successfully`,
-    });
+    return res
+      .status(200)
+      .json({ message: `Event '${eventName}' deleted successfully` });
   } catch (err) {
     console.error("Error deleting event:", err);
     res.status(500).json({ error: "Server error while deleting event" });
@@ -140,7 +208,7 @@ router.delete("/delete", async (req, res) => {
 // GET /event/getAllForThisUser
 router.get("/getAllForThisUser", authenticateToken, async (req, res) => {
   try {
-    const creatorId = req.user.id; // comes from the JWT payload
+    const creatorId = req.user.id;
 
     const result = await pool.query(
       "SELECT * FROM events WHERE CreatorID = $1 ORDER BY id ASC",
@@ -173,7 +241,7 @@ router.get("/getAllForThisUser", authenticateToken, async (req, res) => {
 
 router.get("/getEventsToAttendByUser", authenticateToken, async (req, res) => {
   try {
-    const userId = req.user.id; // comes from the JWT payload
+    const userId = req.user.id;
 
     const queryResult = await pool.query(
       "SELECT e.name FROM attendance as a JOIN events as e on a.eventid = e.id WHERE a.memberid = $1 AND a.willattend = true",
@@ -231,11 +299,11 @@ router.get(
 router.get("/getAllFutureEvents", async (req, res) => {
   try {
     const result = await pool.query(`
-    SELECT *
-    FROM events
-    WHERE (date + event_time) > NOW()
-    ORDER BY date ASC, event_time ASC
-  `);
+      SELECT *
+      FROM events
+      WHERE (date + event_time) > NOW()
+      ORDER BY date ASC, event_time ASC
+    `);
 
     if (result.rows.length === 0) {
       return res.status(404).json({ message: "No events found" });
@@ -249,8 +317,24 @@ router.get("/getAllFutureEvents", async (req, res) => {
       eventRequiredSkills: ev.requiredskills,
       eventUrgency: ev.urgency,
       eventDate: ev.date,
+      eventTime: ev.event_time,
       organization: ev.organization,
       hours: ev.hours,
+      // slots per skill + filled counts
+      firstaid: ev.firstaid,
+      foodservice: ev.foodservice,
+      logistics: ev.logistics,
+      teaching: ev.teaching,
+      eventsetup: ev.eventsetup,
+      dataentry: ev.dataentry,
+      customerservice: ev.customerservice,
+      firstaidFilled: ev.firstaidfilled,
+      foodserviceFilled: ev.foodservicefilled,
+      logisticsFilled: ev.logisticsfilled,
+      teachingFilled: ev.teachingfilled,
+      eventsetupFilled: ev.eventsetupfilled,
+      dataentryFilled: ev.dataentryfilled,
+      customerserviceFilled: ev.customerservicefilled,
     }));
 
     res.status(200).json({ events });
@@ -260,15 +344,27 @@ router.get("/getAllFutureEvents", async (req, res) => {
   }
 });
 
-router.get("/:name", async (req, res) => {
+/**
+ * GET /event/:value
+ * Supports either numeric ID or name string, returns full event details
+ * including per-skill slots and filled counts.
+ */
+router.get("/:value", async (req, res) => {
   try {
-    const { name } = req.params;
+    const { value } = req.params;
 
-    if (!name) return res.status(400).json({ error: "Event name is required" });
-
-    const result = await pool.query("SELECT * FROM events WHERE name = $1", [
-      name,
-    ]);
+    let result;
+    if (/^\d+$/.test(value)) {
+      // numeric -> treat as ID
+      result = await pool.query("SELECT * FROM events WHERE id = $1", [
+        Number(value),
+      ]);
+    } else {
+      // otherwise treat as name
+      result = await pool.query("SELECT * FROM events WHERE name = $1", [
+        value,
+      ]);
+    }
 
     if (result.rows.length === 0)
       return res.status(404).json({ error: "Event not found" });
@@ -281,14 +377,11 @@ router.get("/:name", async (req, res) => {
       eventDescription: ev.description,
       eventLocation: ev.location,
       eventZipCode: ev.zipcode,
-
       eventUrgency: ev.urgency,
       eventDate: ev.date,
       eventTime: ev.event_time,
       organization: ev.organization,
       hours: ev.hours,
-
-      // --- SKILL NEEDS ---
       firstAid: ev.firstaid,
       foodService: ev.foodservice,
       logistics: ev.logistics,
@@ -296,8 +389,6 @@ router.get("/:name", async (req, res) => {
       eventSetup: ev.eventsetup,
       dataEntry: ev.dataentry,
       customerService: ev.customerservice,
-
-      // --- SKILL FILLED ---
       firstAidFilled: ev.firstaidfilled,
       foodServiceFilled: ev.foodservicefilled,
       logisticsFilled: ev.logisticsfilled,
@@ -312,32 +403,6 @@ router.get("/:name", async (req, res) => {
   }
 });
 
-// GET /event/id/:name -> returns the event ID and details by name
-router.get("/id/:name", async (req, res) => {
-  try {
-    const { name } = req.params;
-
-    // Query the event by name
-    const result = await pool.query(
-      "SELECT id, name, description, location, zipcode, requiredskills, urgency, date, organization, hours FROM events WHERE name = $1",
-      [name]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ message: "Event not found" });
-    }
-
-    // Return the event details (including id)
-    res.status(200).json({
-      message: "Event found",
-      event: result.rows[0],
-    });
-  } catch (err) {
-    console.error("Error fetching event ID:", err.message);
-    res.status(500).json({ error: "Server error while fetching event ID" });
-  }
-});
-
 router.put("/signup/:eventName", authenticateToken, async (req, res) => {
   try {
     const { eventName } = req.params;
@@ -348,10 +413,9 @@ router.put("/signup/:eventName", authenticateToken, async (req, res) => {
       return res.status(400).json({ error: "Skill is required to sign up" });
     }
 
-    const skillColumn = skill.toLowerCase(); // e.g. foodService → foodservice
-    const filledColumn = skillColumn + "filled"; // e.g. foodservicefilled
+    const skillColumn = skill.toLowerCase();
+    const filledColumn = skillColumn + "filled";
 
-    // 1️⃣ Get event row
     const eventResult = await pool.query(
       "SELECT * FROM events WHERE name = $1",
       [eventName]
@@ -369,14 +433,12 @@ router.put("/signup/:eventName", authenticateToken, async (req, res) => {
       return res.status(400).json({ error: "Invalid skill type" });
     }
 
-    // 2️⃣ Prevent signing up if full
     if (alreadyFilled >= totalNeeded) {
       return res.status(400).json({
         error: `No available slots left for ${skill}`,
       });
     }
 
-    // 3️⃣ Upsert attendance + store skill
     const attendance = await pool.query(
       `
       INSERT INTO attendance (memberid, eventid, willattend, hasattended, skill)
@@ -388,7 +450,6 @@ router.put("/signup/:eventName", authenticateToken, async (req, res) => {
       [userId, ev.id, skill]
     );
 
-    // 4️⃣ Increment the correct skillFilled column
     await pool.query(
       `UPDATE events SET ${filledColumn} = ${filledColumn} + 1 WHERE id = $1`,
       [ev.id]
@@ -409,7 +470,6 @@ router.put("/cancelSignUp/:eventName", authenticateToken, async (req, res) => {
     const { eventName } = req.params;
     const userId = req.user.id;
 
-    // 1️⃣ Get event row
     const eventResult = await pool.query(
       "SELECT * FROM events WHERE name = $1",
       [eventName]
@@ -420,7 +480,6 @@ router.put("/cancelSignUp/:eventName", authenticateToken, async (req, res) => {
 
     const ev = eventResult.rows[0];
 
-    // 2️⃣ Get the user's current skill
     const attendanceResult = await pool.query(
       "SELECT skill FROM attendance WHERE memberid = $1 AND eventid = $2",
       [userId, ev.id]
@@ -429,13 +488,11 @@ router.put("/cancelSignUp/:eventName", authenticateToken, async (req, res) => {
     if (attendanceResult.rows.length === 0)
       return res.status(404).json({ message: "Attendance record not found" });
 
-    const oldSkill = attendanceResult.rows[0].skill; // e.g. "foodService"
+    const oldSkill = attendanceResult.rows[0].skill;
 
-    // If the user had chosen a skill previously:
     if (oldSkill) {
       const filledColumn = oldSkill.toLowerCase() + "filled";
 
-      // 3️⃣ Decrement skill filled count (never go below 0)
       await pool.query(
         `UPDATE events
          SET ${filledColumn} = GREATEST(${filledColumn} - 1, 0)
@@ -444,7 +501,6 @@ router.put("/cancelSignUp/:eventName", authenticateToken, async (req, res) => {
       );
     }
 
-    // 4️⃣ Null the skill and mark willattend false
     const updateAttendance = await pool.query(
       `
       UPDATE attendance
@@ -480,9 +536,10 @@ router.put("/edit/:id", async (req, res) => {
       eventDate,
       organization,
       hours,
+      eventTime,
+      skillNeeds,
     } = req.body;
 
-    // Check if event exists
     const existingEvent = await pool.query(
       "SELECT * FROM events WHERE id = $1",
       [id]
@@ -491,27 +548,41 @@ router.put("/edit/:id", async (req, res) => {
       return res.status(404).json({ message: "Event not found" });
     }
 
-    var eventUrgencyNumberForm = 0;
+    let eventUrgencyNumberForm = null;
+    if (eventUrgency === "Critical") eventUrgencyNumberForm = 3;
+    else if (eventUrgency === "High") eventUrgencyNumberForm = 2;
+    else if (eventUrgency === "Medium") eventUrgencyNumberForm = 1;
+    else if (eventUrgency === "Low") eventUrgencyNumberForm = 0;
 
-    if (eventUrgency == "Critical") eventUrgencyNumberForm = 3;
-    else if (eventUrgency == "High") eventUrgencyNumberForm = 2;
-    else if (eventUrgency == "Medium") eventUrgencyNumberForm = 1;
-    else if (eventUrgency == "Low") eventUrgencyNumberForm = 0;
+    const firstAid = skillNeeds?.firstAid;
+    const foodService = skillNeeds?.foodService;
+    const logistics = skillNeeds?.logistics;
+    const teaching = skillNeeds?.teaching;
+    const eventSetup = skillNeeds?.eventSetup;
+    const dataEntry = skillNeeds?.dataEntry;
+    const customerService = skillNeeds?.customerService;
 
-    // Update event by ID
     const updateQuery = `
       UPDATE events
       SET
-        name = COALESCE($1, name),
-        description = COALESCE($2, description),
-        location = COALESCE($3, location),
-        zipcode = COALESCE($4, zipcode),
-        requiredskills = COALESCE($5, requiredskills),
-        urgency = COALESCE($6, urgency),
-        date = COALESCE($7, date),
-        organization = COALESCE($8, organization),
-        hours = COALESCE($9, hours)
-      WHERE id = $10
+        name            = COALESCE($1,  name),
+        description     = COALESCE($2,  description),
+        location        = COALESCE($3,  location),
+        zipcode         = COALESCE($4,  zipcode),
+        requiredskills  = COALESCE($5,  requiredskills),
+        urgency         = COALESCE($6,  urgency),
+        date            = COALESCE($7,  date),
+        organization    = COALESCE($8,  organization),
+        hours           = COALESCE($9,  hours),
+        event_time      = COALESCE($10, event_time),
+        firstaid        = COALESCE($11, firstaid),
+        foodservice     = COALESCE($12, foodservice),
+        logistics       = COALESCE($13, logistics),
+        teaching        = COALESCE($14, teaching),
+        eventsetup      = COALESCE($15, eventsetup),
+        dataentry       = COALESCE($16, dataentry),
+        customerservice = COALESCE($17, customerservice)
+      WHERE id = $18
       RETURNING *;
     `;
 
@@ -525,6 +596,14 @@ router.put("/edit/:id", async (req, res) => {
       eventDate,
       organization,
       hours,
+      eventTime,
+      firstAid,
+      foodService,
+      logistics,
+      teaching,
+      eventSetup,
+      dataEntry,
+      customerService,
       id,
     ];
 

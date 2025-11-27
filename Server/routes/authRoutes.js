@@ -11,6 +11,7 @@ const JWT_SECRET = process.env.JWT_SECRET || "test_secret_fallback";
 // POST /auth/register
 router.post("/register", async (req, res) => {
   const { firstName, lastName, username, email, password } = req.body || {};
+
   try {
     const saltRounds = 10;
     const hash = await bcrypt.hash(password, saltRounds);
@@ -30,10 +31,9 @@ router.post("/register", async (req, res) => {
 
 // POST /auth/login
 router.post("/login", async (req, res) => {
-  const { username, password } = req.body;
+  const { username, password } = req.body || {};
 
   try {
-    // Look up the user
     const queryResult = await pool.query(
       "SELECT id, password FROM userprofiles WHERE username = $1",
       [username]
@@ -45,14 +45,13 @@ router.post("/login", async (req, res) => {
 
     const user = queryResult.rows[0];
 
-    // Compare the password with the stored hash
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
-    // Generate JWT token
-    const token = jwt.sign({ username: username, id: user.id }, JWT_SECRET, {
+    // Token payload includes both username and id
+    const token = jwt.sign({ username, id: user.id }, JWT_SECRET, {
       expiresIn: "1h",
     });
 
@@ -66,13 +65,13 @@ router.post("/login", async (req, res) => {
   }
 });
 
+// (helper is unused right now, but harmless to keep)
 async function doesUserExist(username, email) {
   const existingUser = await pool.query(
     "SELECT * FROM userprofiles WHERE username = $1 OR emailaddress = $2",
     [username, email]
   );
-
-  if (existingUser.rows.length > 0) return true;
+  return existingUser.rows.length > 0;
 }
 
 module.exports = router;

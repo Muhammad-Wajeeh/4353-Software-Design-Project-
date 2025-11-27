@@ -208,12 +208,12 @@ export default function Sidebar() {
         {authed && (
           <>
             <Item
-              to="/eventmanagement"
+              to="/EventManagement"
               icon={<Icon.Calendar />}
               label="Event Management"
             />
             <Item
-              to="/profilemanagement"
+              to="/ProfileManagement"
               icon={<Icon.Users />}
               label="Profile Management"
             />
@@ -245,8 +245,8 @@ export default function Sidebar() {
         {/* Auth gates for auth links */}
         {!authed && (
           <>
-            <Item to="/register" icon={<Icon.Lock />} label="Register" />
-            <Item to="/login" icon={<Icon.Lock />} label="Login" />
+            <Item to="/Register" icon={<Icon.Lock />} label="Register" />
+            <Item to="/Login" icon={<Icon.Lock />} label="Login" />
           </>
         )}
         {authed && <Item to="/logout" icon={<Icon.Door />} label="Log Out" />}

@@ -4,7 +4,7 @@ import Button from "react-bootstrap/Button";
 import Form from "react-bootstrap/Form";
 import Sidebar from "./Sidebar";
 
-/** Safe decode (optional) to guard /login for already-authed users */
+/** Safe decode of JWT payload */
 function decodeJwt(token) {
   try {
     const base64Url = token.split(".")[1];
@@ -20,6 +20,7 @@ function decodeJwt(token) {
     return null;
   }
 }
+
 function isTokenValid(token) {
   if (!token) return false;
   const d = decodeJwt(token);
@@ -42,7 +43,9 @@ export default function Login({
   // Fallback local state if props aren't supplied
   const [u, setU] = useState(loginUsername || "");
   const [p, setP] = useState(loginPassword || "");
-  const usePropState = typeof setLoginUsername === "function" && typeof setLoginPassword === "function";
+  const usePropState =
+    typeof setLoginUsername === "function" &&
+    typeof setLoginPassword === "function";
 
   const username = usePropState ? loginUsername : u;
   const password = usePropState ? loginPassword : p;
@@ -54,7 +57,8 @@ export default function Login({
   const [error, setError] = useState("");
 
   const authed = useMemo(() => {
-    const t = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+    const t =
+      typeof window !== "undefined" ? localStorage.getItem("token") : null;
     return isTokenValid(t);
   }, []);
 
@@ -86,8 +90,47 @@ export default function Login({
       const data = await res.json();
       if (!data?.token) throw new Error("No token returned from server.");
 
+      // 1️⃣ store the JWT (same key the rest of the app already uses)
       localStorage.setItem("token", data.token);
-      // Tell listeners (Sidebar, Inbox badge, etc.)
+
+      // 2️⃣ get username & id from token
+      const payload = decodeJwt(data.token) || {};
+      const loginUsername = payload.username || username;
+      const loginUserId =
+        payload.id !== undefined && payload.id !== null
+          ? String(payload.id)
+          : null;
+
+      localStorage.setItem("vh_username", loginUsername);
+      if (loginUserId) {
+        localStorage.setItem("vh_userId", loginUserId);
+      }
+
+      // 3️⃣ (optional but nice) – confirm profile exists by username and
+      //    overwrite vh_userId with the DB row id if needed.
+      try {
+        const profRes = await fetch(
+          `http://localhost:5000/profile/by-username/${encodeURIComponent(
+            loginUsername
+          )}`
+        );
+        if (profRes.ok) {
+          const profData = await profRes.json();
+          if (profData?.user?.id) {
+            localStorage.setItem("vh_userId", String(profData.user.id));
+          }
+        } else {
+          console.warn(
+            "Profile lookup by username failed:",
+            profRes.status,
+            await profRes.text()
+          );
+        }
+      } catch (lookupErr) {
+        console.warn("Could not load profile id at login:", lookupErr);
+      }
+
+      // 4️⃣ notify any listeners (Sidebar badges, etc.)
       window.dispatchEvent(new Event("storage"));
 
       setRedirectToHome(true);
@@ -104,10 +147,13 @@ export default function Login({
 
   return (
     <>
-      {/* ✅ Limited nav shows Home/Browse/Login/Register for logged-out users */}
+      {/* Limited nav shows Home/Browse/Login/Register for logged-out users */}
       <Sidebar />
 
-      <div className="container d-flex justify-content-center" style={{ maxWidth: 520 }}>
+      <div
+        className="container d-flex justify-content-center"
+        style={{ maxWidth: 520 }}
+      >
         <Form className="w-100 mt-5" onSubmit={onSubmit}>
           <h3 className="text-center mb-4">Log In</h3>
 
@@ -135,7 +181,10 @@ export default function Login({
             />
           </Form.Group>
 
-          <Form.Group className="mb-3 d-flex align-items-center gap-2" controlId="checkMeOut">
+          <Form.Group
+            className="mb-3 d-flex align-items-center gap-2"
+            controlId="checkMeOut"
+          >
             <Form.Check type="checkbox" />
             <Form.Label className="m-0">Check me out</Form.Label>
           </Form.Group>
@@ -147,7 +196,12 @@ export default function Login({
           )}
 
           <Form.Group className="mb-4">
-            <Button type="submit" variant="primary" className="w-100" disabled={submitting}>
+            <Button
+              type="submit"
+              variant="primary"
+              className="w-100"
+              disabled={submitting}
+            >
               {submitting ? "Submitting..." : "Submit"}
             </Button>
           </Form.Group>

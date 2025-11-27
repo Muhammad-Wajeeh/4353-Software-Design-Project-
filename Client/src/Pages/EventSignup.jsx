@@ -1,3 +1,4 @@
+// Client/src/Pages/EventSignup.jsx
 import { useParams, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { Form, Button, Card } from "react-bootstrap";
@@ -25,6 +26,7 @@ function EventSignup() {
       const response = await fetch(
         `http://localhost:5000/event/${encodeURIComponent(eventName)}`
       );
+      if (!response.ok) throw new Error("Failed to load event");
       const data = await response.json();
       setEvent(data);
     } catch (error) {
@@ -33,7 +35,13 @@ function EventSignup() {
       navigate("/browseevents");
     }
   };
+
   const onClickSignUpButton = async (eventNameToBeSignedUpFor, skill) => {
+    if (!skill) {
+      alert("Please select a position first.");
+      return;
+    }
+
     try {
       const response = await fetch(
         `http://localhost:5000/event/signup/${encodeURIComponent(
@@ -60,9 +68,18 @@ function EventSignup() {
 
   useEffect(() => {
     fetchEvent();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  if (!event) return <p>Loading...</p>;
+  if (!event)
+    return (
+      <>
+        <Sidebar />
+        <div className="d-flex justify-content-center mt-4">
+          <p>Loading...</p>
+        </div>
+      </>
+    );
 
   return (
     <>

@@ -49,7 +49,10 @@ export default function Home() {
       }
 
       const decoded = decodeJwt(token);
-      if (!decoded?.id) {
+      const storedId = localStorage.getItem("vh_userId");
+      const userId = storedId || decoded?.id;
+
+      if (!userId) {
         localStorage.removeItem("token");
         navigate("/login", { replace: true });
         return;
@@ -57,11 +60,10 @@ export default function Home() {
 
       try {
         const [pRes, eRes, nRes] = await Promise.allSettled([
-          axios.get(`http://localhost:5000/profile/${decoded.id}`),
+          axios.get(`http://localhost:5000/profile/${userId}`),
           axios.get("http://localhost:5000/events/getAllForThisUser", {
             headers: { Authorization: `Bearer ${token}` },
           }),
-          // Prefer an auth-protected, token-based endpoint if you’ve added one:
           axios.get("http://localhost:5000/notifications/getAllForThisUser", {
             headers: { Authorization: `Bearer ${token}` },
             params: { onlyUnread: true },
@@ -89,11 +91,10 @@ export default function Home() {
     })();
   }, [navigate]);
 
-  const name = profile?.fullname || profile?.username || "Volunteer";
+  const name = profile?.name || profile?.username || "Volunteer";
 
   const upcoming = useMemo(() => {
     const copy = [...events];
-    // these fields match your EventManagement shape (eventDate, eventLocation, etc.)
     copy.sort((a, b) => new Date(a.eventDate) - new Date(b.eventDate));
     return copy.slice(0, 5);
   }, [events]);
@@ -116,7 +117,9 @@ export default function Home() {
         <div className="d-flex justify-content-between align-items-center mb-3">
           <div>
             <h2 className="m-0">Welcome back, {name} 👋</h2>
-            <div className="text-muted">Here’s a quick look at what’s coming up.</div>
+            <div className="text-muted">
+              Here’s a quick look at what’s coming up.
+            </div>
           </div>
           <div className="d-flex gap-2">
             <Button as={Link} to="/profilemanagement" variant="outline-primary">
@@ -139,7 +142,12 @@ export default function Home() {
               <Card.Body>
                 <div className="d-flex justify-content-between align-items-center mb-2">
                   <Card.Title className="mb-0">My Upcoming Events</Card.Title>
-                  <Button as={Link} to="/EventManagement" size="sm" variant="outline-primary">
+                  <Button
+                    as={Link}
+                    to="/EventManagement"
+                    size="sm"
+                    variant="outline-primary"
+                  >
                     Manage Events
                   </Button>
                 </div>
@@ -183,8 +191,15 @@ export default function Home() {
             <Card className="shadow-sm h-100">
               <Card.Body>
                 <div className="d-flex justify-content-between align-items-center mb-2">
-                  <Card.Title className="mb-0">Unread Notifications</Card.Title>
-                  <Button as={Link} to="/inbox" size="sm" variant="outline-secondary">
+                  <Card.Title className="mb-0">
+                    Unread Notifications
+                  </Card.Title>
+                  <Button
+                    as={Link}
+                    to="/inbox"
+                    size="sm"
+                    variant="outline-secondary"
+                  >
                     Open Inbox
                   </Button>
                 </div>
@@ -193,17 +208,32 @@ export default function Home() {
                 ) : (
                   <div className="list-group list-group-flush">
                     {unread.slice(0, 5).map((n) => (
-                      <div key={n.id || n.notificationId} className="list-group-item">
+                      <div
+                        key={n.notificationId}
+                        className="list-group-item"
+                      >
                         <div className="d-flex align-items-center gap-2">
-                          <Badge bg={n.isassignment ? "primary" : n.isreminder ? "warning" : "secondary"}>
-                            {n.isassignment ? "assignment" : n.isreminder ? "reminder" : "update"}
+                          <Badge
+                            bg={
+                              n.isAssignment
+                                ? "primary"
+                                : n.isReminder
+                                ? "warning"
+                                : "secondary"
+                            }
+                          >
+                            {n.isAssignment
+                              ? "assignment"
+                              : n.isReminder
+                              ? "reminder"
+                              : "update"}
                           </Badge>
                           <strong>{n.title}</strong>
                         </div>
                         <div className="mt-1">{n.description}</div>
-                        {n.datereceived && (
+                        {n.dateReceived && (
                           <div className="text-muted small">
-                            {new Date(Number(n.datereceived) * 1000).toLocaleString()}
+                            {new Date(n.dateReceived).toLocaleString()}
                           </div>
                         )}
                       </div>
@@ -221,12 +251,18 @@ export default function Home() {
               <Card.Body>
                 <div className="d-flex justify-content-between align-items-center mb-2">
                   <Card.Title className="mb-0">Volunteer Matching</Card.Title>
-                  <Button as={Link} to="/VolunteerMatching" size="sm" variant="outline-primary">
+                  <Button
+                    as={Link}
+                    to="/VolunteerMatching"
+                    size="sm"
+                    variant="outline-primary"
+                  >
                     Open
                   </Button>
                 </div>
                 <div className="text-muted">
-                  Personalized suggestions for events that fit your skills and availability.
+                  Personalized suggestions for events that fit your skills and
+                  availability.
                 </div>
               </Card.Body>
             </Card>
@@ -236,7 +272,12 @@ export default function Home() {
               <Card.Body>
                 <div className="d-flex justify-content-between align-items-center mb-2">
                   <Card.Title className="mb-0">Volunteer History</Card.Title>
-                  <Button as={Link} to="/VolunteerHistory" size="sm" variant="outline-primary">
+                  <Button
+                    as={Link}
+                    to="/VolunteerHistory"
+                    size="sm"
+                    variant="outline-primary"
+                  >
                     Open
                   </Button>
                 </div>

@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+// src/App.jsx
+import { useEffect, useState } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import "./App.css";
 import Login from "./Pages/Login";
@@ -34,6 +35,7 @@ function decodeJwt(token) {
     return null;
   }
 }
+
 function isTokenValid(token) {
   if (!token) return false;
   const d = decodeJwt(token);
@@ -48,7 +50,6 @@ function useAuth() {
   useEffect(() => {
     const onStorage = () => setAuthed(getAuthed());
     window.addEventListener("storage", onStorage);
-    // allow manual dispatch from code (we already do this on login/logout)
     window.addEventListener("auth-changed", onStorage);
     return () => {
       window.removeEventListener("storage", onStorage);
@@ -60,8 +61,7 @@ function useAuth() {
 }
 
 function App() {
-  // keep your state exactly as before
-  const [count, setCount] = useState(0);
+  const [count, setCount] = useState(0); // (kept to match old state)
   const [memberFirstName, setMemberFirstName] = useState("");
   const [memberLastName, setMemberLastName] = useState("");
   const [email, setEmail] = useState("");
@@ -78,7 +78,6 @@ function App() {
   const [eventDate, setEventDate] = useState("");
   const [eventsList, setEventsList] = useState([]);
 
-  // ✅ reactive auth state
   const authed = useAuth();
 
   return (
@@ -155,7 +154,7 @@ function App() {
         />
         <Route path="/Assignments" element={<Assignments />} />
 
-        {/* Fallback */}
+        {/* Fallback – at least gives them the nav */}
         <Route path="*" element={<Sidebar />} />
       </Routes>
     </Router>

@@ -1,14 +1,18 @@
+// Server/app.js
 const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
 
 const app = express();
 
-app.use(cors({
-  origin: ["http://localhost:5173", "http://localhost:3000"],
-  credentials: false,                      // not using cookies for auth
-  allowedHeaders: ["Content-Type", "Authorization"],
-}));
+// CORS – allow your frontends to call the API and send Authorization header
+app.use(
+  cors({
+    origin: ["http://localhost:5173", "http://localhost:3000"],
+    credentials: false, // we’re using JWTs, not cookies
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
 
 app.use(express.json());
 
@@ -25,7 +29,7 @@ app.use("/auth", authRoutes);
 app.use("/profile", profileRoutes);
 app.use("/history", volunteerHistoryRoutes);
 app.use("/notifications", notificationRoutes);
-app.use("/events", eventRoutes);
-app.use("/event", eventRoutes); // legacy
+app.use("/events", eventRoutes); // main events base
+app.use("/event", eventRoutes);  // legacy compatibility
 
 module.exports = app;

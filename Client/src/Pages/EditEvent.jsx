@@ -1,7 +1,17 @@
+// Client/src/Pages/EditEvent.jsx
 import { useParams, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { Form, Button } from "react-bootstrap";
 import Sidebar from "./Sidebar";
+
+// convert DB time like "13:47:00" → "13:47" for <input type="time">
+const dbTimeToInput = (dbTime) => {
+  if (!dbTime) return "";
+  const parts = String(dbTime).split(":");
+  const h = parts[0]?.padStart(2, "0") || "00";
+  const m = parts[1]?.padStart(2, "0") || "00";
+  return `${h}:${m}`;
+};
 
 function EditEvent() {
   const { eventName } = useParams();
@@ -28,7 +38,15 @@ function EditEvent() {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            ...event,
+            // backend expects these names:
+            eventName: event.eventName,
+            eventDescription: event.eventDescription,
+            eventLocation: event.eventLocation,
+            eventZipcode: event.eventZipCode, // lowercase "c" on backend
+            eventUrgency: event.eventUrgency,
+            eventDate: event.eventDate,
+            eventTime: event.eventTime, // "HH:MM" string
+            organization: event.organization,
             skillNeeds: skillNeeds,
           }),
         }
@@ -66,6 +84,9 @@ function EditEvent() {
         eventZipCode: data.eventZipCode,
         eventUrgency: urgencyMap[data.eventUrgency],
         eventDate: new Date(data.eventDate).toISOString().split("T")[0],
+        // convert DB time "13:47:00" → "13:47" for <input type="time">
+        eventTime: dbTimeToInput(data.eventTime),
+        organization: data.organization || "",
       });
 
       setSkillNeeds({
@@ -147,6 +168,19 @@ function EditEvent() {
           />
         </Form.Group>
 
+        <Form.Group className="mb-3" controlId="emOrganization">
+          <Form.Label style={{ fontWeight: "bold" }}>Organization</Form.Label>
+          <Form.Control
+            type="text"
+            placeholder="Enter organization name"
+            name="organization"
+            value={event.organization}
+            onChange={(e) =>
+              setEvent((prev) => ({ ...prev, organization: e.target.value }))
+            }
+          />
+        </Form.Group>
+
         <Form.Group className="mb-3" controlId="emZipCode">
           <Form.Label style={{ fontWeight: "bold" }}>Zip Code</Form.Label>
           <Form.Control
@@ -218,6 +252,18 @@ function EditEvent() {
             value={event.eventDate}
             onChange={(e) =>
               setEvent((prev) => ({ ...prev, eventDate: e.target.value }))
+            }
+          />
+        </Form.Group>
+
+        <Form.Group className="mb-3" controlId="emEventTime">
+          <Form.Label style={{ fontWeight: "bold" }}>Event Time</Form.Label>
+          <Form.Control
+            type="time"
+            name="eventTime"
+            value={event.eventTime || ""}
+            onChange={(e) =>
+              setEvent((prev) => ({ ...prev, eventTime: e.target.value }))
             }
           />
         </Form.Group>

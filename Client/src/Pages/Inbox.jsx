@@ -53,7 +53,10 @@ function Inbox() {
     try {
       const res = await fetch(
         `${API}/notifications/${notificationId}/markAsRead`,
-        { method: "PUT" }
+        {
+          method: "PUT",
+          headers: authHeader(),
+        }
       );
       if (res.ok) {
         setItems((prev) =>
@@ -91,6 +94,7 @@ function Inbox() {
     try {
       const res = await fetch(`${API}/notifications/delete/${notificationId}`, {
         method: "DELETE",
+        headers: authHeader(),
       });
       if (res.ok) {
         setItems((prev) =>
@@ -112,9 +116,10 @@ function Inbox() {
   };
 
   const fmtWhen = (v) => {
-    if (!v && v !== 0) return "";
-    const ms = typeof v === "string" ? Number(v) : v;
-    return Number.isFinite(ms) ? new Date(ms).toLocaleString() : "";
+    if (!v) return "";
+    const d = new Date(v);
+    if (Number.isNaN(d.getTime())) return "";
+    return d.toLocaleString();
   };
 
   return (

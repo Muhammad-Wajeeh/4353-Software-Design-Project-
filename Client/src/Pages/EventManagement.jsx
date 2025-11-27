@@ -1,3 +1,4 @@
+// Client/src/Pages/EventManagement.jsx
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Form, Button, Card } from "react-bootstrap";
@@ -5,7 +6,7 @@ import Sidebar from "./Sidebar";
 import "./EventManagement.css";
 
 function EventManagement(props) {
-  // Support both “lifted state via props” AND local state (fallbacks)
+  // Local fallbacks
   const [localEventName, setLocalEventName] = useState("");
   const [localEventDescription, setLocalEventDescription] = useState("");
   const [localEventLocation, setLocalEventLocation] = useState("");
@@ -15,6 +16,8 @@ function EventManagement(props) {
   const [localEventDate, setLocalEventDate] = useState("");
   const [localEventsList, setLocalEventsList] = useState([]);
   const [localEventTime, setLocalEventTime] = useState("");
+  const [localEventOrganization, setLocalEventOrganization] = useState("");
+
   const [skillNeeds, setSkillNeeds] = useState({
     firstAid: 0,
     foodService: 0,
@@ -55,6 +58,11 @@ function EventManagement(props) {
   const eventTime = props.eventTime ?? localEventTime;
   const setEventTime = props.setEventTime ?? setLocalEventTime;
 
+  const eventOrganization =
+    props.eventOrganization ?? localEventOrganization;
+  const setEventOrganization =
+    props.setEventOrganization ?? setLocalEventOrganization;
+
   const navigate = useNavigate();
 
   const onSubmitForm = async (e) => {
@@ -69,6 +77,7 @@ function EventManagement(props) {
         eventUrgency,
         eventDate,
         eventTime,
+        organization: eventOrganization,
       };
 
       const response = await fetch("http://localhost:5000/event/create", {
@@ -102,6 +111,8 @@ function EventManagement(props) {
       });
       setEventUrgency("");
       setEventDate("");
+      setEventTime("");
+      setEventOrganization("");
       alert("Event created!");
     } catch (err) {
       console.error(err);
@@ -126,13 +137,11 @@ function EventManagement(props) {
 
       const json = await response.json();
 
-      // Server returns { events: [...] } → extract safely
       const eventsArray = Array.isArray(json.events) ? json.events : [];
-
       setEventsList(eventsArray);
     } catch (error) {
       console.error("Error fetching events:", error);
-      setEventsList([]); // ensures it never breaks render
+      setEventsList([]);
     }
   };
 
@@ -209,6 +218,19 @@ function EventManagement(props) {
               name="location"
               value={eventLocation}
               onChange={(e) => setEventLocation(e.target.value)}
+            />
+          </Form.Group>
+
+          <Form.Group className="mb-3" controlId="emOrganization">
+            <Form.Label style={{ paddingBottom: "5px", fontWeight: "bold" }}>
+              Organization
+            </Form.Label>
+            <Form.Control
+              type="text"
+              placeholder="Enter organization name"
+              name="organization"
+              value={eventOrganization}
+              onChange={(e) => setEventOrganization(e.target.value)}
             />
           </Form.Group>
 
@@ -307,21 +329,28 @@ function EventManagement(props) {
 
         <div className="cardsContainer">
           {(Array.isArray(eventsList) ? eventsList : []).map((event) => (
-            <Card key={event.id} style={{ width: "18rem" }}>
+            <Card key={event.id || event.eventName} style={{ width: "18rem" }}>
               <Card.Body>
                 <Card.Title>{event.name ?? event.eventName}</Card.Title>
-                <Card.Subtitle className="mb-2 text-muted">
-                  {event.eventLocation}
+                <Card.Subtitle className="mb-1 text-muted">
+                  {event.organization || "No organization"}
                 </Card.Subtitle>
-                <Card.Subtitle className="mb-2 text-muted">
-                  {(event.eventDate || "").split("T")[0] || "No Date"}
+                <Card.Subtitle className="mb-1 text-muted">
+                  {event.eventLocation || event.location}
+                </Card.Subtitle>
+                <Card.Subtitle className="mb-1 text-muted">
+                  {(event.eventDate || event.date || "")
+                    .toString()
+                    .split("T")[0] || "No Date"}
                 </Card.Subtitle>
 
                 <Card.Subtitle className="mb-2 text-muted">
-                  {event.eventTime}
+                  {event.eventTime || event.event_time || "TBD"}
                 </Card.Subtitle>
 
-                <Card.Text>{event.eventDescription}</Card.Text>
+                <Card.Text>
+                  {event.eventDescription || event.description}
+                </Card.Text>
               </Card.Body>
 
               <Card.Body>

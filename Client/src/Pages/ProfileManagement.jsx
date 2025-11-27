@@ -11,6 +11,7 @@ const prettyDateFormatter = new Intl.DateTimeFormat(undefined, {
   month: "short",
   day: "numeric",
 });
+
 const fmtPretty = (iso) => {
   try {
     return prettyDateFormatter.format(new Date(iso));
@@ -19,33 +20,75 @@ const fmtPretty = (iso) => {
   }
 };
 
-
 const fmt = (d) =>
-  d ? new Date(d.getFullYear(), d.getMonth(), d.getDate()).toISOString().slice(0, 10) : "";
+  d
+    ? new Date(d.getFullYear(), d.getMonth(), d.getDate())
+        .toISOString()
+        .slice(0, 10)
+    : "";
+
+// ---- JWT helper (for fallback if vh_userId missing) ----
+function decodeJwt(token) {
+  try {
+    const base64Url = token.split(".")[1];
+    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split("")
+        .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+        .join("")
+    );
+    return JSON.parse(jsonPayload);
+  } catch {
+    return null;
+  }
+}
+
+// Helper to read logged-in user id consistently
+const getUserId = () => {
+  if (typeof window === "undefined") return null;
+  const stored = localStorage.getItem("vh_userId");
+  if (stored) return stored;
+
+  const token = localStorage.getItem("token");
+  const payload = token ? decodeJwt(token) : null;
+  if (payload?.id !== undefined && payload?.id !== null) {
+    const idStr = String(payload.id);
+    localStorage.setItem("vh_userId", idStr);
+    return idStr;
+  }
+  return null;
+};
 
 export default function ProfileManagement() {
-  // view | edit (no TypeScript generics)
   const [mode, setMode] = useState("view");
   const [validated, setValidated] = useState(false);
 
-  // form state (controlled inputs)
   const [fullName, setFullName] = useState("");
   const [address1, setAddress1] = useState("");
   const [address2, setAddress2] = useState("");
   const [city, setCity] = useState("");
-  const [stateUS, setStateUS] = useState(""); // e.g., "TX"
+  const [stateUS, setStateUS] = useState("");
   const [zip, setZip] = useState("");
   const [skillsSel, setSkillsSel] = useState([]);
   const [preferences, setPreferences] = useState("");
-  const [maxDistance, setMaxDistance] = useState(""); // number or ""
+  const [maxDistance, setMaxDistance] = useState("");
 
-  // dates-only availability
   const [picked, setPicked] = useState(null);
   const [availability, setAvailability] = useState([]);
 
-  // ----- Fetch once on mount -----
+  const userId = getUserId();
+
+  // ----- Fetch once on mount (and when userId changes) -----
   const fetchProfile = async () => {
-    const { data } = await axios.get("http://localhost:5000/profile/u1");
+    if (!userId) {
+      console.warn("No vh_userId in localStorage – user not logged in?");
+      return;
+    }
+
+    const { data } = await axios.get(
+      `http://localhost:5000/profile/${userId}`
+    );
     const u = data.user;
 
     setFullName(u.name ?? "");
@@ -55,12 +98,20 @@ export default function ProfileManagement() {
     setStateUS(u.state ?? "");
     setZip(u.zip ?? "");
     setSkillsSel(Array.isArray(u.skills) ? u.skills : []);
-    setPreferences(u?.preferences?.notes ?? "");
-    setMaxDistance(
-      typeof u?.preferences?.maxDistanceMiles === "number"
-        ? u.preferences.maxDistanceMiles
-        : ""
-    );
+
+    // preferences might be string or object
+    if (u && typeof u.preferences === "object" && !Array.isArray(u.preferences)) {
+      setPreferences(u.preferences.notes ?? "");
+      setMaxDistance(
+        typeof u.preferences.maxDistanceMiles === "number"
+          ? u.preferences.maxDistanceMiles
+          : ""
+      );
+    } else {
+      setPreferences(u?.preferences || "");
+      setMaxDistance("");
+    }
+
     if (u?.availability?.dates && Array.isArray(u.availability.dates)) {
       setAvailability(u.availability.dates);
     } else {
@@ -70,7 +121,7 @@ export default function ProfileManagement() {
 
   useEffect(() => {
     fetchProfile().catch((e) => console.error("Load profile failed", e));
-  }, []); // IMPORTANT: only once on mount
+  }, [userId]);
 
   // ----- helpers -----
   const addDate = () => {
@@ -90,7 +141,7 @@ export default function ProfileManagement() {
   };
 
   const cancelEdit = async () => {
-    await fetchProfile(); // refresh from backend
+    await fetchProfile();
     setValidated(false);
     setMode("view");
   };
@@ -105,6 +156,11 @@ export default function ProfileManagement() {
     setValidated(true);
     if (!(baseValid && datesValid)) return;
 
+    const locParts = [city, stateUS, zip]
+      .map((s) => (s || "").trim())
+      .filter(Boolean);
+    const location = locParts.length ? locParts.join(", ") : undefined;
+
     const body = {
       name: fullName.trim(),
       address1: address1.trim(),
@@ -113,7 +169,7 @@ export default function ProfileManagement() {
       state: stateUS.trim(),
       zip: zip.trim(),
       skills: skillsSel,
-      availability: { dates: availability }, // unified format
+      availability: { dates: availability },
       preferences: {
         notes: preferences,
         maxDistanceMiles:
@@ -125,9 +181,13 @@ export default function ProfileManagement() {
       },
     };
 
+    if (location) {
+      body.location = location;
+    }
+
     try {
-      await axios.put("http://localhost:5000/profile/u1", body);
-      await fetchProfile(); // refresh from server
+      await axios.put(`http://localhost:5000/profile/${userId}`, body);
+      await fetchProfile();
       setMode("view");
       alert("Saved! Profile updated");
     } catch (err) {
@@ -140,101 +200,110 @@ export default function ProfileManagement() {
   };
 
   // ----- VIEW MODE -----
-if (mode === "view") {
-  const infoItem = (label, value) => (
-    <div className="d-flex flex-column mb-2">
-      <span className="text-muted small">{label}</span>
-      <span className="fw-semibold">{value || "—"}</span>
-    </div>
-  );
+  if (mode === "view") {
+    const infoItem = (label, value) => (
+      <div className="d-flex flex-column mb-2">
+        <span className="text-muted small">{label}</span>
+        <span className="fw-semibold">{value || "—"}</span>
+      </div>
+    );
 
-  return (
-    <>
-      <Sidebar />
-      <div className="container mt-4" style={{ maxWidth: 960 }}>
-        <div className="d-flex justify-content-between align-items-center mb-3">
-          <h2 className="m-0">Profile</h2>
-          <Button variant="outline-primary" onClick={enterEdit}>
-            ✏️ Edit
-          </Button>
-        </div>
+    return (
+      <>
+        <Sidebar />
+        <div className="container mt-4" style={{ maxWidth: 960 }}>
+          <div className="d-flex justify-content-between align-items-center mb-3">
+            <h2 className="m-0">Profile</h2>
+            <Button variant="outline-primary" onClick={enterEdit}>
+              ✏️ Edit
+            </Button>
+          </div>
 
-        <div className="card shadow-sm">
-          <div className="card-body">
-            {/* Name */}
-            <div className="d-flex justify-content-between align-items-start mb-3">
-              <div>
-                <div className="text-muted small">Name</div>
-                <div className="fs-5 fw-semibold">{fullName || "—"}</div>
-              </div>
-            </div>
-
-            {/* Address block */}
-            <div className="row">
-              <div className="col-12 col-md-6">
-                {infoItem("Address 1", address1)}
-              </div>
-              <div className="col-12 col-md-6">
-                {infoItem("Address 2", address2)}
-              </div>
-            </div>
-            <div className="row mb-3">
-              <div className="col-12 col-md-4">{infoItem("City", city)}</div>
-              <div className="col-12 col-md-4">{infoItem("State", stateUS)}</div>
-              <div className="col-12 col-md-4">{infoItem("Zip", zip)}</div>
-            </div>
-
-            {/* Skills as chips */}
-            <div className="mb-3">
-              <div className="text-muted small">Skills</div>
-              {skillsSel?.length ? (
-                <div className="mt-1 d-flex flex-wrap gap-2">
-                  {skillsSel.map((s) => (
-                    <span key={s} className="badge rounded-pill text-bg-secondary">
-                      {s}
-                    </span>
-                  ))}
+          <div className="card shadow-sm">
+            <div className="card-body">
+              {/* Name */}
+              <div className="d-flex justify-content-between align-items-start mb-3">
+                <div>
+                  <div className="text-muted small">Name</div>
+                  <div className="fs-5 fw-semibold">{fullName || "—"}</div>
                 </div>
-              ) : (
-                <div className="fw-semibold">—</div>
-              )}
-            </div>
-
-            {/* Preferences */}
-            <div className="row mb-3">
-              <div className="col-12 col-md-8">
-                {infoItem("Preferences (notes)", preferences)}
               </div>
-              <div className="col-12 col-md-4">
-                {infoItem(
-                  "Max Distance (miles)",
-                  maxDistance !== "" && maxDistance !== null ? maxDistance : "—"
+
+              {/* Address block */}
+              <div className="row">
+                <div className="col-12 col-md-6">
+                  {infoItem("Address 1", address1)}
+                </div>
+                <div className="col-12 col-md-6">
+                  {infoItem("Address 2", address2)}
+                </div>
+              </div>
+              <div className="row mb-3">
+                <div className="col-12 col-md-4">{infoItem("City", city)}</div>
+                <div className="col-12 col-md-4">
+                  {infoItem("State", stateUS)}
+                </div>
+                <div className="col-12 col-md-4">{infoItem("Zip", zip)}</div>
+              </div>
+
+              {/* Skills as chips */}
+              <div className="mb-3">
+                <div className="text-muted small">Skills</div>
+                {skillsSel?.length ? (
+                  <div className="mt-1 d-flex flex-wrap gap-2">
+                    {skillsSel.map((s) => (
+                      <span
+                        key={s}
+                        className="badge rounded-pill text-bg-secondary"
+                      >
+                        {s}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="fw-semibold">—</div>
+                )}
+              </div>
+
+              {/* Preferences */}
+              <div className="row mb-3">
+                <div className="col-12 col-md-8">
+                  {infoItem("Preferences (notes)", preferences)}
+                </div>
+                <div className="col-12 col-md-4">
+                  {infoItem(
+                    "Max Distance (miles)",
+                    maxDistance !== "" && maxDistance !== null
+                      ? maxDistance
+                      : "—"
+                  )}
+                </div>
+              </div>
+
+              {/* Availability as pretty date pills */}
+              <div>
+                <div className="text-muted small">Availability (dates)</div>
+                {availability?.length ? (
+                  <div className="mt-2 d-flex flex-wrap gap-2">
+                    {availability.map((d) => (
+                      <span
+                        key={d}
+                        className="badge rounded-pill text-bg-light border"
+                      >
+                        {fmtPretty(d)}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="fw-semibold">—</div>
                 )}
               </div>
             </div>
-
-            {/* Availability as pretty date pills */}
-            <div>
-              <div className="text-muted small">Availability (dates)</div>
-              {availability?.length ? (
-                <div className="mt-2 d-flex flex-wrap gap-2">
-                  {availability.map((d) => (
-                    <span key={d} className="badge rounded-pill text-bg-light border">
-                      {fmtPretty(d)}
-                    </span>
-                  ))}
-                </div>
-              ) : (
-                <div className="fw-semibold">—</div>
-              )}
-            </div>
           </div>
         </div>
-      </div>
-    </>
-  );
-}
-
+      </>
+    );
+  }
 
   // ----- EDIT MODE -----
   return (

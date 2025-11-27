@@ -1,3 +1,4 @@
+// Server/routes/inboxRoutes.js
 const express = require("express");
 const router = express.Router();
 const pool = require("../DB");
@@ -17,11 +18,14 @@ function mapNotification(row) {
   };
 }
 
+/**
+ * GET /notifications/getAllForThisUser
+ * Uses JWT to figure out the user; optional ?onlyUnread=true
+ */
 router.get("/getAllForThisUser", authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id; // comes from the JWT payload
 
-    console.log("beign hit");
     const onlyUnread =
       String(req.query.onlyUnread || "false").toLowerCase() === "true";
 
@@ -33,16 +37,11 @@ router.get("/getAllForThisUser", authenticateToken, async (req, res) => {
       ORDER BY datereceived DESC
     `;
 
-    const creatorId = req.user.id; // comes from the JWT payload
-
     const result = await pool.query(query, [userId]);
 
-    if (result.rows.length === 0) {
-      return res.status(404).json({ message: "No notifications found" });
-    }
-
     const notifications = result.rows.map(mapNotification);
-    res.status(200).json({ notifications });
+    // ✅ Always 200; empty array is fine
+    return res.status(200).json({ notifications });
   } catch (err) {
     console.error("Error fetching notifications:", err.message);
     res
@@ -51,7 +50,7 @@ router.get("/getAllForThisUser", authenticateToken, async (req, res) => {
   }
 });
 
-// 🔹 POST /notifications
+// 🔹 POST /notifications/createNotification
 router.post("/createNotification", authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id; // comes from the JWT payload
@@ -91,7 +90,7 @@ router.post("/createNotification", authenticateToken, async (req, res) => {
   }
 });
 
-// 🔹 PUT /notifications/:id/read
+// 🔹 PUT /notifications/:id/markAsRead
 router.put("/:id/markAsRead", async (req, res) => {
   try {
     const { id } = req.params;
@@ -119,7 +118,7 @@ router.put("/:id/markAsRead", async (req, res) => {
   }
 });
 
-// 🔹 PUT /notifications/:userId/read-all
+// 🔹 PUT /notifications/markAllAsReadForThisUser
 router.put("/markAllAsReadForThisUser", authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id; // comes from the JWT payload
@@ -144,7 +143,7 @@ router.put("/markAllAsReadForThisUser", authenticateToken, async (req, res) => {
   }
 });
 
-// 🔹 DELETE /notifications/:id
+// 🔹 DELETE /notifications/delete/:id
 router.delete("/delete/:id", async (req, res) => {
   try {
     const { id } = req.params;
