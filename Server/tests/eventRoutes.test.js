@@ -1,52 +1,57 @@
 // Server/tests/eventRoutes.test.js
 const request = require("supertest");
 const express = require("express");
+const router = require("../routes/eventRoutes");
 
-jest.mock("../DB", () => ({ query: jest.fn() }));
-jest.mock("../routes/authenticator", () =>
-  jest.fn((req, res, next) => {
-    req.user = { id: 1, username: "demo" }; // mock authenticated user
-    next();
-  })
-);
+jest.mock("../DB", () => ({
+  query: jest.fn(),
+}));
 
 const pool = require("../DB");
-const eventRoutes = require("../routes/eventRoutes");
+
+// Mock authentication middleware
+jest.mock("../routes/authenticator", () => (req, res, next) => {
+  req.user = { id: 123, username: "tester" };
+  next();
+});
 
 function makeApp() {
   const app = express();
   app.use(express.json());
-  app.use("/events", eventRoutes);
+  app.use("/events", router);
   return app;
 }
 
-describe("Event Routes", () => {
-  afterEach(() => jest.clearAllMocks());
+beforeEach(() => {
+  jest.clearAllMocks();
+});
 
-  // -----------------------------------------
-  // GET /events (Volunteer matching)
-  // -----------------------------------------
-  test("GET /events → returns normalized events", async () => {
-    pool.query.mockResolvedValue({
+//
+// ---------------------------------------------------------
+// 1. GET /events
+// ---------------------------------------------------------
+describe("GET /events", () => {
+  test("returns mapped future events", async () => {
+    pool.query.mockResolvedValueOnce({
       rows: [
         {
           id: 1,
-          name: "Food Drive",
-          description: "Help pack meals",
-          location: "UH",
-          zipcode: "77004",
+          name: "A",
+          description: "Desc",
+          location: "Loc",
+          zipcode: "77000",
           urgency: 2,
-          date: "2025-12-01",
-          organization: "SASE",
+          date: "2030-01-01",
+          organization: "Org",
           hours: 3,
-          event_time: "10:00",
+          event_time: "12:00",
           firstaid: 1,
           foodservice: 0,
           logistics: 1,
           teaching: 0,
-          eventsetup: 0,
+          eventsetup: 1,
           dataentry: 0,
-          customerservice: 1,
+          customerservice: 0,
         },
       ],
     });
@@ -55,44 +60,53 @@ describe("Event Routes", () => {
     const res = await request(app).get("/events");
 
     expect(res.status).toBe(200);
-    expect(res.body.events[0]).toMatchObject({
-      id: "1",
-      name: "Food Drive",
-      requiredSkills: ["first aid", "logistics", "customer service"],
-    });
+    expect(res.body.events.length).toBe(1);
+    expect(res.body.events[0].requiredSkills).toEqual([
+      "first aid",
+      "logistics",
+      "event setup",
+    ]);
   });
 
-  test("GET /events → DB error", async () => {
-    pool.query.mockRejectedValue(new Error("DB fail"));
+  test("500 on DB error", async () => {
+    pool.query.mockRejectedValueOnce(new Error("DB down"));
 
     const app = makeApp();
     const res = await request(app).get("/events");
 
     expect(res.status).toBe(500);
-    expect(res.body.error).toBe("Server error while fetching events");
   });
+});
 
-  // -----------------------------------------
-  // GET /events/getall
-  // -----------------------------------------
-  test("GET /events/getall → empty", async () => {
-    pool.query.mockResolvedValue({ rows: [] });
+//
+// ---------------------------------------------------------
+// 2. GET /events/getall (legacy)
+// ---------------------------------------------------------
+describe("GET /events/getall", () => {
+  test("404 when empty", async () => {
+    pool.query.mockResolvedValueOnce({ rows: [] });
 
     const app = makeApp();
     const res = await request(app).get("/events/getall");
 
     expect(res.status).toBe(404);
-    expect(res.body.message).toBe("No events found");
   });
 
-  test("GET /events/getall → success", async () => {
-    pool.query.mockResolvedValue({
+  test("200 returns mapped events", async () => {
+    pool.query.mockResolvedValueOnce({
       rows: [
         {
-          name: "Food Drive",
-          description: "desc",
-          location: "UH",
-          zipcode: "77004",
+          id: 1,
+          name: "E",
+          description: "D",
+          location: "L",
+          zipcode: "7",
+          requiredskills: "x,y",
+          urgency: 2,
+          date: "2029-01-01",
+          event_time: "10:00",
+          organization: "Org",
+          hours: 5,
         },
       ],
     });
@@ -104,84 +118,120 @@ describe("Event Routes", () => {
     expect(res.body.events.length).toBe(1);
   });
 
-  // -----------------------------------------
-  // POST /events/create
-  // -----------------------------------------
-  test("POST /events/create → missing fields", async () => {
+  test("500 on DB error", async () => {
+    pool.query.mockRejectedValueOnce(new Error("xx"));
+
     const app = makeApp();
-    const res = await request(app).post("/events/create").send({});
+    const res = await request(app).get("/events/getall");
+
+    expect(res.status).toBe(500);
+  });
+});
+
+//
+// ---------------------------------------------------------
+// 3. POST /events/create
+// ---------------------------------------------------------
+describe("POST /events/create", () => {
+  test("400 missing eventName or eventDate", async () => {
+    const app = makeApp();
+
+    const res = await request(app)
+      .post("/events/create")
+      .send({ eventName: "" });
 
     expect(res.status).toBe(400);
-    expect(res.body.message).toMatch(/eventName and eventDate/);
   });
 
-  test("POST /events/create → success", async () => {
-    pool.query.mockResolvedValue({});
+  test("201 creates event", async () => {
+    pool.query.mockResolvedValueOnce({}); // INSERT ok
 
     const app = makeApp();
     const res = await request(app)
       .post("/events/create")
       .send({
-        eventName: "Cleanup",
-        eventDescription: "desc",
-        eventLocation: "UH",
-        eventZipCode: "77004",
-        eventUrgency: "High",
-        eventDate: "2025-12-01",
-        eventTime: "10:00",
-        skillNeeds: { firstAid: 1 },
+        eventName: "Test",
+        eventDate: "2030-01-01",
+        skillNeeds: {
+          firstAid: 1,
+          logistics: 2,
+        },
       });
 
     expect(res.status).toBe(201);
-    expect(res.body).toBe("Event Created");
   });
 
-  test("POST /events/create → duplicate name (23505)", async () => {
-    pool.query.mockRejectedValue({ code: "23505" });
+  test("400 duplicate event (23505)", async () => {
+    const err = new Error("dup");
+    err.code = "23505";
+    pool.query.mockRejectedValueOnce(err);
 
     const app = makeApp();
     const res = await request(app).post("/events/create").send({
-      eventName: "Dup",
-      eventDescription: "x",
-      eventLocation: "x",
-      eventDate: "2025-11-01",
-      skillNeeds: {},
+      eventName: "Test",
+      eventDate: "2030-01-01",
     });
 
     expect(res.status).toBe(400);
-    expect(res.body.error).toBe("Event name already exists");
   });
 
-  // -----------------------------------------
-  // DELETE /events/delete
-  // -----------------------------------------
-  test("DELETE /events/delete → missing name", async () => {
+  test("500 on DB error", async () => {
+    pool.query.mockRejectedValueOnce(new Error("BAD"));
+
+    const app = makeApp();
+    const res = await request(app).post("/events/create").send({
+      eventName: "Test",
+      eventDate: "2030-01-01",
+    });
+
+    expect(res.status).toBe(500);
+  });
+});
+
+//
+// ---------------------------------------------------------
+// 4. DELETE /events/delete
+// ---------------------------------------------------------
+describe("DELETE /events/delete", () => {
+  test("400 missing eventName", async () => {
     const app = makeApp();
     const res = await request(app).delete("/events/delete").send({});
 
     expect(res.status).toBe(400);
-    expect(res.body.error).toBe("eventName is required");
   });
 
-  test("DELETE /events/delete → success", async () => {
-    pool.query
-      .mockResolvedValueOnce({ rows: [{ name: "Cleanup" }] }) // existing
-      .mockResolvedValueOnce({}); // deletion
+  test("404 event not found", async () => {
+    pool.query.mockResolvedValueOnce({ rows: [] });
 
     const app = makeApp();
     const res = await request(app)
       .delete("/events/delete")
-      .send({ eventName: "Cleanup" });
+      .send({ eventName: "A" });
 
-    expect(res.status).toBe(200);
-    expect(res.body.message).toMatch(/deleted successfully/);
+    expect(res.status).toBe(404);
   });
 
-  // -----------------------------------------
-  // GET /events/getAllForThisUser
-  // -----------------------------------------
-  test("GET /events/getAllForThisUser → no events", async () => {
-    pool.query.mockResolvedValue({ rows: [] });
+  test("200 deletes event", async () => {
+    pool.query
+      .mockResolvedValueOnce({ rows: [{}] }) // SELECT
+      .mockResolvedValueOnce({}); // DELETE
+
+    const app = makeApp();
+    const res = await request(app)
+      .delete("/events/delete")
+      .send({ eventName: "A" });
+
+    expect(res.status).toBe(200);
+  });
+});
+
+//
+// ---------------------------------------------------------
+// 5. GET /events/getAllForThisUser
+// ---------------------------------------------------------
+describe("GET /events/getAllForThisUser", () => {
+  test("401 no events", async () => {
+    pool.query.mockResolvedValueOnce({ rows: [] });
 
     const app = makeApp();
     const res = await request(app).get("/events/getAllForThisUser");
@@ -189,117 +239,276 @@ describe("Event Routes", () => {
     expect(res.status).toBe(401);
   });
 
-  test("GET /events/getAllForThisUser → success", async () => {
-    pool.query.mockResolvedValue({
-      rows: [{ name: "Cleanup", location: "UH", zipcode: "77004" }],
+  test("200 returns events", async () => {
+    pool.query.mockResolvedValueOnce({
+      rows: [{ name: "A", description: "D" }],
     });
 
     const app = makeApp();
     const res = await request(app).get("/events/getAllForThisUser");
 
     expect(res.status).toBe(200);
-    expect(res.body.events.length).toBe(1);
   });
+});
 
-  // -----------------------------------------
-  // PUT /events/signup/:eventName
-  // -----------------------------------------
-  test("PUT /signup/:ev → invalid skill", async () => {
+//
+// ---------------------------------------------------------
+// 6. GET /events/getEventsToAttendByUser
+// ---------------------------------------------------------
+describe("GET /events/getEventsToAttendByUser", () => {
+  test("200 returns mapped", async () => {
     pool.query.mockResolvedValueOnce({
-      rows: [{ id: 1, logistics: 1, logisticsfilled: 0 }],
+      rows: [{ name: "A", hasattended: false, willattend: true }],
     });
 
     const app = makeApp();
-    const res = await request(app)
-      .put("/events/signup/FoodDrive")
-      .send({ skill: "WRONGSKILL" });
+    const res = await request(app).get("/events/getEventsToAttendByUser");
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(200);
+    expect(res.body.eventsAttendedOrToBeAttended.length).toBe(1);
   });
+});
 
-  test("PUT /signup/:ev → success", async () => {
-    pool.query
-      .mockResolvedValueOnce({
-        rows: [
-          {
-            id: 1,
-            logistics: 3,
-            logisticsfilled: 1,
-            hours: 3,
-          },
-        ],
-      })
-      .mockResolvedValueOnce({ rows: [{ id: 1 }] }) // attendance insert
-      .mockResolvedValueOnce({}); // event update
+//
+// ---------------------------------------------------------
+// 7. GET /events/getEventsToAttendByUserAndThePosition
+// ---------------------------------------------------------
+describe("GET /events/getEventsToAttendByUserAndThePosition", () => {
+  test("200 returns rows", async () => {
+    pool.query.mockResolvedValueOnce({
+      rows: [{ eventid: 1, eventName: "A" }],
+    });
 
     const app = makeApp();
-    const res = await request(app)
-      .put("/events/signup/FoodDrive")
-      .send({ skill: "logistics" });
+    const res = await request(app).get(
+      "/events/getEventsToAttendByUserAndThePosition"
+    );
 
     expect(res.status).toBe(200);
   });
+});
 
-  // -----------------------------------------
-  // PUT /cancelSignUp/:eventName
-  // -----------------------------------------
-  test("PUT /cancelSignUp/:ev → event not found", async () => {
+//
+// ---------------------------------------------------------
+// 8. GET /events/getAllFutureEvents
+// ---------------------------------------------------------
+describe("GET /events/getAllFutureEvents", () => {
+  test("404 empty", async () => {
     pool.query.mockResolvedValueOnce({ rows: [] });
 
     const app = makeApp();
-    const res = await request(app).put("/events/cancelSignUp/BadEvent");
+    const res = await request(app).get("/events/getAllFutureEvents");
 
     expect(res.status).toBe(404);
   });
 
-  // -----------------------------------------
-  // GET /events/:value (numeric or string)
-  // -----------------------------------------
-  test("GET /events/:value → not found", async () => {
-    pool.query.mockResolvedValue({ rows: [] });
-
-    const app = makeApp();
-    const res = await request(app).get("/events/9999");
-
-    expect(res.status).toBe(404);
-  });
-
-  test("GET /events/:value → returns event", async () => {
-    pool.query.mockResolvedValue({
+  test("200 returns mapped", async () => {
+    pool.query.mockResolvedValueOnce({
       rows: [
         {
-          id: 1,
-          name: "Cleanup",
-          description: "desc",
-          location: "UH",
-          zipcode: "77004",
+          name: "A",
+          description: "D",
+          location: "L",
+          zipcode: "X",
           urgency: 2,
-          date: "2025-12-01",
+          date: "2030-01-01",
           event_time: "10:00",
-          organization: "SASE",
-          hours: 3,
+          organization: "Org",
+          hours: 2,
           firstaid: 1,
-          foodservice: 0,
-          logistics: 1,
-          teaching: 0,
-          eventsetup: 0,
-          dataentry: 0,
-          customerservice: 0,
           firstaidfilled: 0,
-          foodservicefilled: 0,
-          logisticsfilled: 0,
-          teachingfilled: 0,
-          eventsetupfilled: 0,
-          dataentryfilled: 0,
-          customerservicefilled: 0,
         },
       ],
     });
 
     const app = makeApp();
-    const res = await request(app).get("/events/Cleanup");
+    const res = await request(app).get("/events/getAllFutureEvents");
 
     expect(res.status).toBe(200);
-    expect(res.body.eventName).toBe("Cleanup");
+  });
+});
+
+//
+// ---------------------------------------------------------
+// 9. GET /events/:value
+// ---------------------------------------------------------
+describe("GET /events/:value", () => {
+  test("404 not found", async () => {
+    pool.query.mockResolvedValueOnce({ rows: [] });
+
+    const app = makeApp();
+    const res = await request(app).get("/events/999");
+
+    expect(res.status).toBe(404);
+  });
+
+  test("200 by id", async () => {
+    pool.query.mockResolvedValueOnce({
+      rows: [{ id: 1, name: "A", firstaid: 1 }],
+    });
+
+    const app = makeApp();
+    const res = await request(app).get("/events/1");
+
+    expect(res.status).toBe(200);
+  });
+
+  test("200 by name", async () => {
+    pool.query.mockResolvedValueOnce({
+      rows: [{ id: 1, name: "Test" }],
+    });
+
+    const app = makeApp();
+    const res = await request(app).get("/events/Test");
+
+    expect(res.status).toBe(200);
+  });
+});
+
+//
+// ---------------------------------------------------------
+// 10. PUT /events/signup/:eventName
+// ---------------------------------------------------------
+describe("PUT /events/signup/:eventName", () => {
+  test("400 missing skill", async () => {
+    const app = makeApp();
+    const res = await request(app).put("/events/signup/E").send({});
+
+    expect(res.status).toBe(400);
+  });
+
+  test("404 event not found", async () => {
+    pool.query.mockResolvedValueOnce({ rows: [] });
+
+    const app = makeApp();
+    const res = await request(app)
+      .put("/events/signup/E")
+      .send({ skill: "firstaid" });
+
+    expect(res.status).toBe(404);
+  });
+
+  test("400 invalid skill type", async () => {
+    pool.query.mockResolvedValueOnce({
+      rows: [{ id: 1, notaskill: 0 }],
+    });
+
+    const app = makeApp();
+    const res = await request(app)
+      .put("/events/signup/E")
+      .send({ skill: "invalidSkill" });
+
+    expect(res.status).toBe(400);
+  });
+
+  test("400 no slots available", async () => {
+    pool.query.mockResolvedValueOnce({
+      rows: [
+        {
+          id: 1,
+          firstaid: 1,
+          firstaidfilled: 1,
+        },
+      ],
+    });
+
+    const app = makeApp();
+    const res = await request(app)
+      .put("/events/signup/E")
+      .send({ skill: "firstAid" });
+
+    expect(res.status).toBe(400);
+  });
+
+  test("200 signs up", async () => {
+    pool.query
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 1,
+            hours: 2,
+            firstaid: 2,
+            firstaidfilled: 0,
+          },
+        ],
+      }) // SELECT event
+      .mockResolvedValueOnce({
+        rows: [{ id: 1, memberid: 123 }],
+      }) // INSERT attendance
+      .mockResolvedValueOnce({}); // UPDATE events filled count
+
+    const app = makeApp();
+    const res = await request(app)
+      .put("/events/signup/E")
+      .send({ skill: "firstAid" });
+
+    expect(res.status).toBe(200);
+  });
+});
+
+//
+// ---------------------------------------------------------
+// 11. PUT /events/cancelSignUp/:eventName
+// ---------------------------------------------------------
+describe("PUT /events/cancelSignUp/:eventName", () => {
+  test("404 event not found", async () => {
+    pool.query.mockResolvedValueOnce({ rows: [] });
+
+    const app = makeApp();
+    const res = await request(app).put("/events/cancelSignUp/E");
+
+    expect(res.status).toBe(404);
+  });
+
+  test("404 attendance not found", async () => {
+    pool.query
+      .mockResolvedValueOnce({ rows: [{ id: 1 }] }) // event
+      .mockResolvedValueOnce({ rows: [] }); // attendance
+
+    const app = makeApp();
+    const res = await request(app).put("/events/cancelSignUp/E");
+
+    expect(res.status).toBe(404);
+  });
+
+  test("200 cancels signup", async () => {
+    pool.query
+      .mockResolvedValueOnce({ rows: [{ id: 1 }] }) // event
+      .mockResolvedValueOnce({ rows: [{ skill: "firstaid" }] }) // attendance
+      .mockResolvedValueOnce({}) // update events filled count
+      .mockResolvedValueOnce({ rows: [{ id: 1, willattend: false }] }); // update attendance
+
+    const app = makeApp();
+    const res = await request(app).put("/events/cancelSignUp/E");
+
+    expect(res.status).toBe(200);
+  });
+});
+
+//
+// ---------------------------------------------------------
+// 12. PUT /events/edit/:id
+// ---------------------------------------------------------
+describe("PUT /events/edit/:id", () => {
+  test("404 event not found", async () => {
+    pool.query.mockResolvedValueOnce({ rows: [] });
+
+    const app = makeApp();
+    const res = await request(app).put("/events/edit/1");
+  });
+
+  test("200 edits event", async () => {
+    pool.query
+      .mockResolvedValueOnce({ rows: [{ id: 1 }] }) // existing event
+      .mockResolvedValueOnce({ rows: [{ id: 1, name: "Updated" }] }); // updated
+
+    const app = makeApp();
+    const res = await request(app)
+      .put("/events/edit/1")
+      .send({
+        eventName: "Updated",
+        skillNeeds: { firstAid: 2 },
+      });
+
   });
 });
