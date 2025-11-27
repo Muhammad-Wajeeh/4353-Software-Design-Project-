@@ -12,6 +12,7 @@
   "author": "Dustin & Muhammad",
   "license": "ISC",
   "dependencies": {
+    "@swc/helpers": "^0.5.17",
     "bcrypt": "^6.0.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
@@ -19,7 +20,9 @@
     "express": "^5.1.0",
     "jsonwebtoken": "^9.0.2",
     "nodemon": "^3.1.10",
-    "pg": "^8.16.3"
+    "pdfkit": "^0.17.2",
+    "pg": "^8.16.3",
+    "tslib": "^2.8.1"
   },
   "devDependencies": {
     "cross-env": "^10.1.0",

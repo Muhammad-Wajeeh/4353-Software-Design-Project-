@@ -19,6 +19,7 @@ import PublicHome from "./Pages/PublicHome";
 import Logout from "./Pages/Logout";
 import EventSignup from "./Pages/EventSignup";
 import Assignments from "./Pages/Assignments";
+import Reports from "./Pages/Reports";
 
 function decodeJwt(token) {
   try {
@@ -153,6 +154,7 @@ function App() {
           element={<EventSignup />}
         />
         <Route path="/Assignments" element={<Assignments />} />
+        <Route path="/reports" element={<Reports />} />
 
         {/* Fallback – at least gives them the nav */}
         <Route path="*" element={<Sidebar />} />

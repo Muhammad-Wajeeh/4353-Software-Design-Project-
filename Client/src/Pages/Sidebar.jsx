@@ -83,6 +83,14 @@ const Icon = {
       />
     </svg>
   ),
+  Chart: (p) => (
+  <svg viewBox="0 0 24 24" aria-hidden="true" {...p}>
+    <path
+      fill="currentColor"
+      d="M4 4h2v16H4V4Zm7 5h2v11h-2V9Zm7-3h2v14h-2V6Z"
+    />
+  </svg>
+  ),
 };
 
 function decodeJwt(token) {
@@ -211,6 +219,11 @@ export default function Sidebar() {
               to="/EventManagement"
               icon={<Icon.Calendar />}
               label="Event Management"
+            />
+            <Item
+              to="/reports"
+              icon={<Icon.Chart />}
+              label="Reports"
             />
             <Item
               to="/ProfileManagement"
