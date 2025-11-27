@@ -35,7 +35,7 @@ const fmtTime = (t) => {
   return `${h12}:${mStr.padStart(2, "0")} ${suffix}`;
 };
 
-// For positions in the details modal (uses /event/:name shape)
+// For positions in both modals (uses /event/:name shape)
 const SKILL_FIELDS = [
   ["firstAid", "First Aid"],
   ["foodService", "Food Service"],
@@ -135,10 +135,16 @@ export default function VolunteerMatching() {
 
   // track events already joined (based on notifications)
   const [joinedNames, setJoinedNames] = useState(() => new Set());
-  const navigate = useNavigate();
+  const navigate = useNavigate(); // currently unused but fine to keep
 
+  // Details modal
   const [detailsEvent, setDetailsEvent] = useState(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
+
+  // Signup modal (new)
+  const [signupEvent, setSignupEvent] = useState(null);
+  const [signupSkill, setSignupSkill] = useState("");
+  const [signupLoading, setSignupLoading] = useState(false);
 
   const userId = getUserId();
   const token =
@@ -232,46 +238,6 @@ export default function VolunteerMatching() {
     return list;
   }, [scored, filterMode, sortMode]);
 
-  // Join: create an "assignment" notification and update UI
-  const handleJoin = async (ev) => {
-    if (!token) {
-      alert("Please log in to join events.");
-      return;
-    }
-
-    if (joinedNames.has(ev.name)) {
-      alert("You’ve already requested to join this event.");
-      return;
-    }
-
-    try {
-      await axios.post(
-        "http://localhost:5000/notifications/createNotification",
-        {
-          title: `Requested to join: ${ev.name}`,
-          description: `You requested to join "${ev.name}" on ${fmtDate(
-            ev.date
-          )} at ${ev.location}.`,
-          isReminder: false,
-          isAssignment: true,
-        },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-
-      setJoinedNames((prev) => {
-        const next = new Set(prev);
-        next.add(ev.name);
-        return next;
-      });
-      window.dispatchEvent(new Event("notificationsUpdated"));
-    } catch (e) {
-      console.error(e);
-      alert("Could not send request.");
-    }
-  };
-
   // ---------- Details modal (fetch full event with slots) ----------
   const openDetails = async (ev) => {
     try {
@@ -296,8 +262,9 @@ export default function VolunteerMatching() {
     const rows = SKILL_FIELDS.map(([key, label]) => {
       const total = Number(detailsEvent[key] ?? 0);
       const filled =
-        Number(detailsEvent[key + "Filled"] ?? detailsEvent[key + "filled"] ?? 0) ||
-        0;
+        Number(
+          detailsEvent[key + "Filled"] ?? detailsEvent[key + "filled"] ?? 0
+        ) || 0;
 
       if (!total) return null;
 
@@ -335,6 +302,161 @@ export default function VolunteerMatching() {
 
     return <div>{rows}</div>;
   };
+
+  // ---------- Signup modal (position selection) ----------
+
+  const openSignupModal = async (ev) => {
+    if (!token) {
+      alert("Please log in to join events.");
+      return;
+    }
+
+    if (joinedNames.has(ev.name)) {
+      alert("You’ve already requested to join this event.");
+      return;
+    }
+
+    try {
+      setSignupLoading(true);
+      setSignupSkill("");
+      // load full event + slot counts (same as EventSignup.jsx)
+      const res = await axios.get(
+        `http://localhost:5000/event/${encodeURIComponent(ev.name)}`
+      );
+      setSignupEvent(res.data);
+    } catch (err) {
+      console.error("Failed to load event for signup", err);
+      alert("Could not load event details for signup.");
+    } finally {
+      setSignupLoading(false);
+    }
+  };
+
+  const closeSignupModal = () => {
+    setSignupEvent(null);
+    setSignupSkill("");
+    setSignupLoading(false);
+  };
+
+  const handleConfirmSignup = async () => {
+    if (!signupEvent || !signupSkill) {
+      alert("Please select a position first.");
+      return;
+    }
+
+    if (!token) {
+      alert("Please log in to join events.");
+      return;
+    }
+
+    try {
+      setSignupLoading(true);
+
+      // 1) Put to /event/signup/:name with { skill }
+      await axios.put(
+        `http://localhost:5000/event/signup/${encodeURIComponent(
+          signupEvent.eventName
+        )}`,
+        { skill: signupSkill },
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      // 2) Create assignment notification (keeps existing functionality)
+      await axios.post(
+        "http://localhost:5000/notifications/createNotification",
+        {
+          title: `Requested to join: ${signupEvent.eventName}`,
+          description: `You requested to join "${signupEvent.eventName}" on ${fmtDate(
+            signupEvent.eventDate
+          )} at ${signupEvent.eventLocation}.`,
+          isReminder: false,
+          isAssignment: true,
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      // 3) Update joined set locally so card shows Joined
+      setJoinedNames((prev) => {
+        const next = new Set(prev);
+        next.add(signupEvent.eventName);
+        return next;
+      });
+
+      // let Inbox badge refresh
+      window.dispatchEvent(new Event("notificationsUpdated"));
+
+      alert("Signed up!");
+      closeSignupModal();
+    } catch (err) {
+      console.error("Could not sign up", err);
+      alert("Could not sign up for this event.");
+    } finally {
+      setSignupLoading(false);
+    }
+  };
+
+  const renderSignupPositions = () => {
+    if (!signupEvent) return null;
+
+    const rows = SKILL_FIELDS.map(([key, label]) => {
+      const total = Number(signupEvent[key] ?? 0);
+      const filled =
+        Number(
+          signupEvent[key + "Filled"] ??
+            signupEvent[key + "filled"] ??
+            0
+        ) || 0;
+
+      if (!total) return null;
+      const remaining = Math.max(total - filled, 0);
+
+      return (
+        <div
+          key={key}
+          className="d-flex justify-content-between align-items-center my-2 p-2 border rounded"
+          style={{ background: "#fafafa" }}
+        >
+          <div>
+            <strong>{label}</strong>{" "}
+            <span className="text-muted">
+              {filled}/{total}
+            </span>
+          </div>
+
+          {remaining > 0 ? (
+            <Form.Check
+              type="radio"
+              name="skillSelect"
+              checked={signupSkill === key}
+              onChange={() => setSignupSkill(key)}
+              label="Choose"
+            />
+          ) : (
+            <span className="text-danger fw-bold">Full</span>
+          )}
+        </div>
+      );
+    }).filter(Boolean);
+
+    if (!rows.length) {
+      return (
+        <p className="text-muted">
+          No specific positions have been configured for this event.
+        </p>
+      );
+    }
+
+    return <div>{rows}</div>;
+  };
+
+  // ---------- main render ----------
 
   if (loading) {
     return (
@@ -423,8 +545,12 @@ export default function VolunteerMatching() {
                       <Button
                         variant={isJoined ? "success" : "outline-primary"}
                         disabled={isJoined}
-                        onClick={() => handleJoin(ev)}
-                        title={isJoined ? "Already joined" : "Request to join"}
+                        onClick={() => openSignupModal(ev)}
+                        title={
+                          isJoined
+                            ? "Already joined"
+                            : "Request to join and pick a position"
+                        }
                       >
                         {isJoined ? "Joined" : "Join"}
                       </Button>
@@ -494,6 +620,60 @@ export default function VolunteerMatching() {
             </>
           )}
         </Modal.Body>
+      </Modal>
+
+      {/* Signup modal (position selection) */}
+      <Modal
+        show={!!signupEvent}
+        onHide={closeSignupModal}
+        centered
+        size="lg"
+        backdrop="static"
+      >
+        <Modal.Header closeButton>
+          <Modal.Title>
+            {signupEvent
+              ? `Select a Position for ${signupEvent.eventName}`
+              : "Select a Position"}
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {signupLoading && !signupEvent && (
+            <div className="text-center py-3">
+              <Spinner animation="border" />
+            </div>
+          )}
+
+          {signupEvent && (
+            <>
+              <p className="text-muted text-center">
+                {signupEvent.eventLocation} —{" "}
+                {(signupEvent.eventDate || "").toString().split("T")[0]}
+              </p>
+
+              <Form>
+                <Form.Group>
+                  <Form.Label className="fw-bold">
+                    Available Positions
+                  </Form.Label>
+                  {renderSignupPositions()}
+                </Form.Group>
+              </Form>
+            </>
+          )}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={closeSignupModal}>
+            Cancel
+          </Button>
+          <Button
+            variant="success"
+            onClick={handleConfirmSignup}
+            disabled={!signupSkill || signupLoading}
+          >
+            Confirm Signup
+          </Button>
+        </Modal.Footer>
       </Modal>
     </>
   );

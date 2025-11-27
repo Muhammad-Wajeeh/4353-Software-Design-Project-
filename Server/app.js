@@ -22,6 +22,7 @@ const profileRoutes = require("./routes/profileRoutes");
 const volunteerHistoryRoutes = require("./routes/volunteerHistoryRoutes");
 const notificationRoutes = require("./routes/inboxRoutes");
 const eventRoutes = require("./routes/eventRoutes");
+const matchingRoutes = require("./routes/matchingRoutes");
 
 app.get("/", (req, res) => res.send("API is running"));
 
@@ -31,5 +32,6 @@ app.use("/history", volunteerHistoryRoutes);
 app.use("/notifications", notificationRoutes);
 app.use("/events", eventRoutes); // main events base
 app.use("/event", eventRoutes);  // legacy compatibility
+app.use("/matching", matchingRoutes);
 
 module.exports = app;
