@@ -20,6 +20,14 @@ const ROLE_GROUPS = {
   ],
 };
 
+function labelForKey(key) {
+  for (const group of Object.values(ROLE_GROUPS)) {
+    const found = group.find((r) => r.key === key);
+    if (found) return found.label;
+  }
+  return key;
+}
+
 function buildEventRoleSummary(eventRow) {
   const formatted = [];
 
@@ -306,6 +314,7 @@ router.get("/my-events/:eventId/volunteers", async (req, res) => {
 
 // ============================================================
 // 5) PER-EVENT ASSIGNMENTS (positions + who is in them)
+//     NOW COUNTS "FILLED" FROM ATTENDANCE
 // ============================================================
 
 router.get("/my-events/:eventId/assignments", async (req, res) => {
@@ -333,7 +342,6 @@ router.get("/my-events/:eventId/assignments", async (req, res) => {
     }
 
     const event = evQ.rows[0];
-    const rolesSummary = buildEventRoleSummary(event);
 
     const aQ = await pool.query(
       `
@@ -359,10 +367,31 @@ router.get("/my-events/:eventId/assignments", async (req, res) => {
       [eventId]
     );
 
+    const assignments = aQ.rows;
+
+    // Count how many volunteers per role based on assignments
+    const filledByLabel = {};
+    assignments.forEach((a) => {
+      const label = labelForKey(a.skill);
+      if (!label) return;
+      filledByLabel[label] = (filledByLabel[label] || 0) + 1;
+    });
+
+    // Start from event's configured totals, then override "filled" from counts
+    let rolesSummary = buildEventRoleSummary(event).map((r) => {
+      const filled = filledByLabel[r.role] || 0;
+      const total = r.total || 0;
+      return {
+        ...r,
+        filled,
+        remaining: total - filled,
+      };
+    });
+
     res.json({
       event,
       rolesSummary,
-      assignments: aQ.rows,
+      assignments,
     });
   } catch (err) {
     console.error("Error /reports/my-events/:eventId/assignments:", err);

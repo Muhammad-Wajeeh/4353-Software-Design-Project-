@@ -1,4 +1,3 @@
-// Client/src/Pages/Reports.jsx
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import Sidebar from "./Sidebar";
@@ -7,7 +6,6 @@ import Button from "react-bootstrap/Button";
 import Form from "react-bootstrap/Form";
 import Card from "react-bootstrap/Card";
 
-// PDF libs (client-side)
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -21,6 +19,24 @@ const fmtDate = (iso) =>
         day: "numeric",
       })
     : "";
+
+// Nice display labels for skill codes
+const ROLE_LABELS = {
+  firstaid: "First Aid",
+  foodservice: "Food Service",
+  logistics: "Logistics",
+  eventsetup: "Event Setup",
+  teaching: "Teaching",
+  dataentry: "Data Entry",
+  customerservice: "Customer Service",
+};
+
+const ROLE_CATEGORIES = {
+  "Physical roles": ["firstaid", "foodservice", "logistics", "eventsetup"],
+  "Educational / admin roles": ["teaching", "dataentry", "customerservice"],
+};
+
+const skillLabel = (skill) => ROLE_LABELS[skill] || skill || "—";
 
 export default function Reports() {
   // "volunteers" | "events" | "my-volunteers" | "my-assignments"
@@ -36,8 +52,11 @@ export default function Reports() {
   const [myEvents, setMyEvents] = useState([]);
   const [loadingMyEvents, setLoadingMyEvents] = useState(false);
   const [selectedMyEventId, setSelectedMyEventId] = useState("");
+  const [selectedEventMeta, setSelectedEventMeta] = useState(null);
+
   const [myEventVolunteers, setMyEventVolunteers] = useState([]);
   const [myEventAssignments, setMyEventAssignments] = useState([]);
+  const [myRolesSummary, setMyRolesSummary] = useState([]);
   const [loadingMyDetail, setLoadingMyDetail] = useState(false);
 
   const token =
@@ -111,12 +130,15 @@ export default function Reports() {
             { headers }
           );
           setMyEventVolunteers(res.data.volunteers || []);
+          setSelectedEventMeta(res.data.event || null);
         } else if (activeTab === "my-assignments") {
           const res = await axios.get(
             `${API_BASE}/reports/my-events/${selectedMyEventId}/assignments`,
             { headers }
           );
           setMyEventAssignments(res.data.assignments || []);
+          setMyRolesSummary(res.data.rolesSummary || []);
+          setSelectedEventMeta(res.data.event || null);
         }
       } catch (err) {
         console.error("Failed to load per-event report", err);
@@ -124,7 +146,9 @@ export default function Reports() {
           setMyEventVolunteers([]);
         } else if (activeTab === "my-assignments") {
           setMyEventAssignments([]);
+          setMyRolesSummary([]);
         }
+        setSelectedEventMeta(null);
       } finally {
         setLoadingMyDetail(false);
       }
@@ -231,6 +255,8 @@ export default function Reports() {
     doc.save(filename);
   };
 
+  // ----------------- GLOBAL TABLES -----------------
+
   const renderVolunteerTable = () => {
     if (loadingVolunteers) {
       return (
@@ -244,31 +270,54 @@ export default function Reports() {
       return <p className="text-muted">No volunteer data found.</p>;
     }
 
+    const totalVols = volunteers.length;
+    const totalEvents = volunteers.reduce(
+      (sum, v) => sum + (Number(v.events_attended) || 0),
+      0
+    );
+
     return (
-      <div className="table-responsive">
-        <table className="table table-sm align-middle">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Volunteer</th>
-              <th>Username</th>
-              <th>Email</th>
-              <th className="text-end">Events attended</th>
-            </tr>
-          </thead>
-          <tbody>
-            {volunteers.map((v) => (
-              <tr key={v.id}>
-                <td>{v.id}</td>
-                <td>{v.fullname || "—"}</td>
-                <td>{v.username || "—"}</td>
-                <td>{v.email || "—"}</td>
-                <td className="text-end">{v.events_attended || 0}</td>
+      <>
+        <div className="d-flex flex-wrap gap-3 mb-3">
+          <div className="border rounded px-3 py-2 small bg-light">
+            <div className="text-uppercase text-muted" style={{ fontSize: 11 }}>
+              Total volunteers
+            </div>
+            <div style={{ fontSize: 18, fontWeight: 600 }}>{totalVols}</div>
+          </div>
+          <div className="border rounded px-3 py-2 small bg-light">
+            <div className="text-uppercase text-muted" style={{ fontSize: 11 }}>
+              Total event sign-ups
+            </div>
+            <div style={{ fontSize: 18, fontWeight: 600 }}>{totalEvents}</div>
+          </div>
+        </div>
+
+        <div className="table-responsive">
+          <table className="table table-sm align-middle">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Volunteer</th>
+                <th>Username</th>
+                <th>Email</th>
+                <th className="text-end">Events attended</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {volunteers.map((v) => (
+                <tr key={v.id}>
+                  <td>{v.id}</td>
+                  <td>{v.fullname || "—"}</td>
+                  <td>{v.username || "—"}</td>
+                  <td>{v.email || "—"}</td>
+                  <td className="text-end">{v.events_attended || 0}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </>
     );
   };
 
@@ -285,32 +334,106 @@ export default function Reports() {
       return <p className="text-muted">No event data found.</p>;
     }
 
+    const totalEvents = events.length;
+    const totalAssignments = events.reduce(
+      (sum, e) => sum + (Number(e.volunteers_assigned) || 0),
+      0
+    );
+
     return (
-      <div className="table-responsive">
-        <table className="table table-sm align-middle">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Event</th>
-              <th>Date</th>
-              <th>Location</th>
-              <th>Description</th>
-              <th className="text-end">Volunteers assigned</th>
-            </tr>
-          </thead>
-          <tbody>
-            {events.map((e) => (
-              <tr key={e.id}>
-                <td>{e.id}</td>
-                <td>{e.name}</td>
-                <td>{fmtDate(e.date)}</td>
-                <td>{e.location}</td>
-                <td>{e.description}</td>
-                <td className="text-end">{e.volunteers_assigned || 0}</td>
+      <>
+        <div className="d-flex flex-wrap gap-3 mb-3">
+          <div className="border rounded px-3 py-2 small bg-light">
+            <div className="text-uppercase text-muted" style={{ fontSize: 11 }}>
+              Total events
+            </div>
+            <div style={{ fontSize: 18, fontWeight: 600 }}>{totalEvents}</div>
+          </div>
+          <div className="border rounded px-3 py-2 small bg-light">
+            <div className="text-uppercase text-muted" style={{ fontSize: 11 }}>
+              Total volunteer assignments
+            </div>
+            <div style={{ fontSize: 18, fontWeight: 600 }}>
+              {totalAssignments}
+            </div>
+          </div>
+        </div>
+
+        <div className="table-responsive">
+          <table className="table table-sm align-middle">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Event</th>
+                <th>Date</th>
+                <th>Location</th>
+                <th>Description</th>
+                <th className="text-end">Volunteers assigned</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {events.map((e) => (
+                <tr key={e.id}>
+                  <td>{e.id}</td>
+                  <td>{e.name}</td>
+                  <td>{fmtDate(e.date)}</td>
+                  <td>{e.location}</td>
+                  <td>{e.description}</td>
+                  <td className="text-end">{e.volunteers_assigned || 0}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </>
+    );
+  };
+
+  // ----------------- PER-EVENT DASHBOARD VIEWS -----------------
+
+  const renderSelectedEventHeader = () => {
+    if (!selectedMyEventId) {
+      return null;
+    }
+    if (!selectedEventMeta) {
+      return (
+        <p className="text-muted mb-3">Loading event details…</p>
+      );
+    }
+
+    return (
+      <div className="mb-3">
+        <div
+          className="d-flex flex-wrap justify-content-between align-items-center"
+          style={{ gap: "0.75rem" }}
+        >
+          <div>
+            <div
+              className="text-uppercase text-muted"
+              style={{ fontSize: 11 }}
+            >
+              Selected event
+            </div>
+            <div style={{ fontSize: 18, fontWeight: 600 }}>
+              {selectedEventMeta.name}
+            </div>
+            <div style={{ fontSize: 13 }}>
+              {fmtDate(selectedEventMeta.date)}
+              {selectedEventMeta.location
+                ? ` • ${selectedEventMeta.location}`
+                : ""}
+            </div>
+          </div>
+          {selectedEventMeta.description && (
+            <div
+              className="small text-muted"
+              style={{ maxWidth: 360, fontSize: 12 }}
+            >
+              {selectedEventMeta.description}
+            </div>
+          )}
+        </div>
+        <hr className="mt-2 mb-3" />
       </div>
     );
   };
@@ -329,46 +452,76 @@ export default function Reports() {
     }
 
     if (!myEventVolunteers.length) {
-      return (
-        <p className="text-muted">No volunteers for this event yet.</p>
-      );
+      return <p className="text-muted">No volunteers for this event yet.</p>;
     }
 
+    const totalVols = myEventVolunteers.length;
+    const totalHours = myEventVolunteers.reduce(
+      (sum, v) => sum + (Number(v.hours_this_event) || 0),
+      0
+    );
+    const avgHours =
+      totalVols > 0 ? (totalHours / totalVols).toFixed(1) : "0.0";
+
     return (
-      <div className="table-responsive">
-        <table className="table table-sm align-middle">
-          <thead>
-            <tr>
-              <th>Volunteer</th>
-              <th>Username</th>
-              <th>Email</th>
-              <th className="text-end">This event: hours</th>
-              <th className="text-end">This event: status</th>
-              <th className="text-end">Total events</th>
-              <th className="text-end">Total hours</th>
-            </tr>
-          </thead>
-          <tbody>
-            {myEventVolunteers.map((v) => (
-              <tr key={v.id}>
-                <td>{v.fullname || "—"}</td>
-                <td>{v.username || "—"}</td>
-                <td>{v.email || "—"}</td>
-                <td className="text-end">
-                  {v.hours_this_event !== null && v.hours_this_event !== undefined
-                    ? v.hours_this_event
-                    : "—"}
-                </td>
-                <td className="text-end">
-                  {v.status_this_event || "—"}
-                </td>
-                <td className="text-end">{v.total_events || 0}</td>
-                <td className="text-end">{v.total_hours || 0}</td>
+      <>
+        {renderSelectedEventHeader()}
+
+        <div className="d-flex flex-wrap gap-3 mb-3">
+          <div className="border rounded px-3 py-2 small bg-light">
+            <div className="text-uppercase text-muted" style={{ fontSize: 11 }}>
+              Volunteers for this event
+            </div>
+            <div style={{ fontSize: 18, fontWeight: 600 }}>{totalVols}</div>
+          </div>
+          <div className="border rounded px-3 py-2 small bg-light">
+            <div className="text-uppercase text-muted" style={{ fontSize: 11 }}>
+              Total hours volunteered (this event)
+            </div>
+            <div style={{ fontSize: 18, fontWeight: 600 }}>{totalHours}</div>
+          </div>
+          <div className="border rounded px-3 py-2 small bg-light">
+            <div className="text-uppercase text-muted" style={{ fontSize: 11 }}>
+              Avg hours per volunteer
+            </div>
+            <div style={{ fontSize: 18, fontWeight: 600 }}>{avgHours}</div>
+          </div>
+        </div>
+
+        <div className="table-responsive">
+          <table className="table table-sm align-middle">
+            <thead>
+              <tr>
+                <th>Volunteer</th>
+                <th>Username</th>
+                <th>Email</th>
+                <th className="text-end">This event: hours</th>
+                <th className="text-end">This event: status</th>
+                <th className="text-end">Total events</th>
+                <th className="text-end">Total hours</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {myEventVolunteers.map((v) => (
+                <tr key={v.id}>
+                  <td>{v.fullname || "—"}</td>
+                  <td>{v.username || "—"}</td>
+                  <td>{v.email || "—"}</td>
+                  <td className="text-end">
+                    {v.hours_this_event !== null &&
+                    v.hours_this_event !== undefined
+                      ? v.hours_this_event
+                      : "—"}
+                  </td>
+                  <td className="text-end">{v.status_this_event || "—"}</td>
+                  <td className="text-end">{v.total_events || 0}</td>
+                  <td className="text-end">{v.total_hours || 0}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </>
     );
   };
 
@@ -385,41 +538,120 @@ export default function Reports() {
       );
     }
 
-    if (!myEventAssignments.length) {
-      return (
-        <p className="text-muted">No assignments yet for this event.</p>
-      );
+    if (!myEventAssignments.length && !myRolesSummary.length) {
+      return <p className="text-muted">No assignments yet for this event.</p>;
     }
 
+    // Build a quick lookup from label ("First Aid") to summary stats
+    const summaryByLabel = {};
+    myRolesSummary.forEach((r) => {
+      summaryByLabel[r.role] = r;
+    });
+
     return (
-      <div className="table-responsive">
-        <table className="table table-sm align-middle">
-          <thead>
-            <tr>
-              <th>Role</th>
-              <th>Volunteer</th>
-              <th>Username</th>
-              <th>Email</th>
-              <th className="text-end">Hours</th>
-              <th className="text-end">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {myEventAssignments.map((a, idx) => (
-              <tr key={idx}>
-                <td>{a.skill || "—"}</td>
-                <td>{a.fullname || "—"}</td>
-                <td>{a.username || "—"}</td>
-                <td>{a.email || "—"}</td>
-                <td className="text-end">
-                  {a.hours !== null && a.hours !== undefined ? a.hours : "—"}
-                </td>
-                <td className="text-end">{a.status || "—"}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <>
+        {renderSelectedEventHeader()}
+
+        {Object.entries(ROLE_CATEGORIES).map(
+          ([categoryName, skillsForCategory]) => {
+            // Build role "cards" for this category
+            const rolesForCategory = skillsForCategory
+              .map((skill) => {
+                const label = skillLabel(skill);
+                const summary = summaryByLabel[label] || {
+                  total: 0,
+                  filled: 0,
+                  remaining: 0,
+                };
+                const volunteers = myEventAssignments.filter(
+                  (a) => a.skill === skill
+                );
+                // If nothing configured and no volunteers, skip this card
+                if (
+                  !volunteers.length &&
+                  !summary.total &&
+                  !summary.filled &&
+                  !summary.remaining
+                ) {
+                  return null;
+                }
+                return { skill, label, summary, volunteers };
+              })
+              .filter(Boolean);
+
+            if (!rolesForCategory.length) {
+              return null;
+            }
+
+            return (
+              <div key={categoryName} className="mb-4">
+                <div
+                  className="text-uppercase text-muted mb-2"
+                  style={{ fontSize: 11 }}
+                >
+                  {categoryName}
+                </div>
+                <div className="row g-3">
+                  {rolesForCategory.map(({ skill, label, summary, volunteers }) => (
+                    <div key={skill} className="col-12 col-md-6 col-lg-4">
+                      <div className="border rounded h-100 p-3 d-flex flex-column">
+                        <div className="d-flex justify-content-between mb-1">
+                          <div style={{ fontWeight: 600 }}>{label}</div>
+                          <div className="small text-muted">
+                            {summary.filled}/{summary.total || 0} filled
+                          </div>
+                        </div>
+                        <div
+                          className="small text-muted mb-2"
+                          style={{ fontSize: 11 }}
+                        >
+                          {summary.remaining > 0
+                            ? `${summary.remaining} spots remaining`
+                            : summary.total
+                            ? "Fully filled"
+                            : "No positions configured"}
+                        </div>
+
+                        {volunteers.length ? (
+                          <ul className="list-unstyled mb-0 small">
+                            {volunteers.map((v, idx) => (
+                              <li
+                                key={idx}
+                                className="d-flex justify-content-between"
+                                style={{ fontSize: 12 }}
+                              >
+                                <span>
+                                  {v.fullname || "—"}{" "}
+                                  <span className="text-muted">
+                                    ({v.username || "—"})
+                                  </span>
+                                </span>
+                                <span className="text-end">
+                                  {v.hours != null ? `${v.hours}h` : ""}{" "}
+                                  <span className="text-muted">
+                                    {v.status ? `· ${v.status}` : ""}
+                                  </span>
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <div
+                            className="small text-muted"
+                            style={{ fontSize: 12 }}
+                          >
+                            No volunteers assigned yet.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          }
+        )}
+      </>
     );
   };
 
@@ -444,10 +676,13 @@ export default function Reports() {
               size="sm"
               value={activeTab}
               onChange={(e) => {
-                setActiveTab(e.target.value);
+                const next = e.target.value;
+                setActiveTab(next);
                 setSelectedMyEventId("");
+                setSelectedEventMeta(null);
                 setMyEventVolunteers([]);
                 setMyEventAssignments([]);
+                setMyRolesSummary([]);
               }}
               style={{ width: 260 }}
             >
@@ -470,7 +705,13 @@ export default function Reports() {
               <Form.Select
                 size="sm"
                 value={selectedMyEventId}
-                onChange={(e) => setSelectedMyEventId(e.target.value)}
+                onChange={(e) => {
+                  setSelectedMyEventId(e.target.value);
+                  setSelectedEventMeta(null);
+                  setMyEventVolunteers([]);
+                  setMyEventAssignments([]);
+                  setMyRolesSummary([]);
+                }}
                 style={{ width: 260 }}
                 disabled={loadingMyEvents}
               >
@@ -512,9 +753,9 @@ export default function Reports() {
 
         <p className="text-muted small mt-3">
           CSV and PDF exports are available for the global reports. For your
-          event-specific reports, use the dropdown to select one of your
-          created events and review volunteers and assignments directly in the
-          dashboard.
+          event-specific reports, use the dropdown to select one of your created
+          events and review volunteers and assignments directly in the
+          dashboard-style view.
         </p>
       </div>
     </>
